@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Give&Take2026</title>
+<title>Give&Take【Max】</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
 :root{
@@ -135,7 +135,7 @@ td.e.day-1,td.e.day-2,td.e.day-3,td.e.day-4,td.e.day-5,td.e.day-6{background-col
 <div id="pw-screen">
   <div class="inner">
     <div style="font-size:48px;">🔒</div>
-    <h2>Give&Take2026</h2>
+    <h2>Give&Take【Max】</h2>
     <p>パスワードを入力してください</p>
     <input type="password" id="pw-input" placeholder="パスワード" onkeydown="if(event.key==='Enter')checkPW()">
     <br><button onclick="checkPW()">ログイン</button>
@@ -145,7 +145,7 @@ td.e.day-1,td.e.day-2,td.e.day-3,td.e.day-4,td.e.day-5,td.e.day-6{background-col
 
 <div id="app" style="display:none;">
 <div class="topbar">
-  <h1>📅 Give&Take2026</h1>
+  <h1>📅 Give&Take【Max】</h1>
   <div class="info" id="top-info">単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → ピン固定</div>
   <button class="btn-reset" onclick="resetAll()">✕ リセット</button>
 </div>
@@ -439,7 +439,7 @@ function printSwap(){
   const c=s.cands[ci];
   
   const pa=document.getElementById('print-area');
-  let h='<div class="print-title">Give&Take2026 ─ 授業交換確認書</div>';
+  let h='<div class="print-title">Give&Take【Max】 ─ 授業交換確認書</div>';
   h+=`<div class="print-subtitle">対象クラス: ${s.mc}</div>`;
   
   // 交換プレビュー
