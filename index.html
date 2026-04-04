@@ -131,7 +131,7 @@ v5.2 2026-04-04<br>
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
-<div class="topbar"><h1>📅 Give&Take【Max】</h1><div class="info" id="top-info">単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定</div><button onclick="resetAll()">✕ リセット</button></div>
+<div class="topbar"><h1>📅 Give&Take【Max】</h1><div class="info" id="top-info">単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定</div><button id="btn-move" onclick="toggleMoveMode()" style="padding:4px 10px;border:1px solid #d97706;border-radius:5px;font-size:10px;cursor:pointer;background:#fff;color:#d97706;font-weight:600;margin-right:8px;">🔧 移動（教務）</button><button onclick="resetAll()">✕ リセット</button></div>
 <div class="filter-bar">
   <button id="btn-table" onclick="switchView('table')" style="padding:4px 10px;border:1px solid var(--border);border-radius:5px;font-size:10px;cursor:pointer;background:#fff;">📋 一覧</button>
   <button id="btn-cal" onclick="switchView('cal')" style="padding:4px 10px;border:1px solid var(--accent);border-radius:5px;font-size:10px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600;">📅 カレンダー</button>
@@ -140,8 +140,7 @@ v5.2 2026-04-04<br>
   <div class="sep"></div>
   <label>検索:</label><input type="text" id="f-name" placeholder="教員名..." oninput="applyFilter()" style="width:120px;">
   <div class="sep">
-  <div class="sep"></div>
-  <button id="btn-move" onclick="toggleMoveMode()" style="padding:4px 10px;border:1px solid #d97706;border-radius:5px;font-size:10px;cursor:pointer;background:#fff;color:#d97706;font-weight:600;">🔧 移動（教務）</button>
+
 </div>
   <div class="pinned-info" id="pin-info">📌 <span id="pin-name"></span><button onclick="unpin()">✕</button></div>
 </div>
@@ -565,6 +564,7 @@ async function loadSwapHistory(){
       // dateA/dateBをYYYY-MM-DD形式に正規化（GASが日付型で返す場合対応）
       if(sw.dateA){var dtA=new Date(sw.dateA);if(!isNaN(dtA.getTime()))sw.dateA=dtA.getFullYear()+'-'+pad2(dtA.getMonth()+1)+'-'+pad2(dtA.getDate());}
       if(sw.dateB){var dtB=new Date(sw.dateB);if(!isNaN(dtB.getTime()))sw.dateB=dtB.getFullYear()+'-'+pad2(dtB.getMonth()+1)+'-'+pad2(dtB.getDate());}
+      if(sw.class_name){var cn=sw.class_name;var dtC=new Date(cn);if(!isNaN(dtC.getTime())&&cn.length>4){sw.class_name=(dtC.getMonth()+1)+'-'+dtC.getDate();}}
       return sw;
     });
     buildCalData();if(document.getElementById('cw').style.display!=='none')renderCal();
@@ -817,7 +817,7 @@ async function undoSwap(dateStr,teacher,period){
   msg+=(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+found.slotB+' '+found.teacherB+'「'+found.lessonB+'」';
   if(!confirm(msg))return;
   // GASからも削除（パスワード不要）
-  var result=await gasGet('deleteSwap',{dateA:found.dateA,periodA:String(found.periodA||''),dateB:found.dateB,periodB:String(found.periodB||''),teacherA:found.teacherA,teacherB:found.teacherB});
+  var result=await gasGet('deleteSwap',{datetime:found.datetime||'',dateA:found.dateA,periodA:String(found.periodA||''),dateB:found.dateB,periodB:String(found.periodB||''),teacherA:found.teacherA,teacherB:found.teacherB});
   if(!result||!result.success){alert('⚠ GASの削除に失敗: '+(result?JSON.stringify(result):'通信エラー')+'\nリロードすると元に戻ります');}
   swapHistory.splice(foundIdx,1);
   buildCalData();
