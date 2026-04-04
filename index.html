@@ -118,12 +118,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v4.5 2026-04-04<br>
-- Fix: dateA/B normalized from GAS response<br>
-- Fix: off-day cells show swapped lessons<br>
-- Undo swap: click "→移動" to cancel (no pw)<br>
-- Re-swap: swapped slots treated as free<br>
-- Triangle swap + off-day swap with warning
+v5.0 2026-04-04<br>
+- Fix: undo syncs with GAS (persists on reload)<br>
+- Fix: re-swap detects moved-out regular slots<br>
+- Fix: init order (no empty-state flash)<br>
+- Fix: UI text "click to undo" (was "long press")<br>
+- Triangle + off-day + re-swap fully working
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -279,10 +279,10 @@ function teacherRow(tn,isPinned){
 }
 
 function clickCell(tn,day,per){
-  console.log('clickCell:',tn,day,per);
   var e=(byT[tn]||{})[day+'-'+per];
-  console.log('byT entry:',e?e.lesson:'none');
-  // 通常授業が見つからない場合、交換で移動してきた授業を探す（三角交換用）
+  // レギュラーにあっても、交換で移動済みならswapMapのmoved_inを探す
+  if(e&&isSlotSwappedAway(tn,day,per)){e=null;}
+  // 交換で移動してきた授業を探す（三角交換・再交換用）
   if(!e){
     var found=null;
     Object.keys(swapMap).forEach(function(ds){
@@ -298,9 +298,8 @@ function clickCell(tn,day,per){
         }
       }
     });
-    if(found){e=found;console.log('swapMap found:',e.lesson);}
+    if(found)e=found;
   }
-  console.log('final e:',e?e.lesson:'none','deploy:',e?e.is_deploy:'','teachers:',e?e.teachers.length:'','classes:',e?(e.all_classes||[]).length:'');
   if(!e||e.is_deploy||e.teachers.length>1||(e.all_classes&&e.all_classes.length>1))return;
   var cls=e.all_classes?e.all_classes.join(','):(e.class_name||'');
   document.getElementById('top-info').textContent='選択: '+tn+' '+DN[day]+per+'限「'+e.lesson+'」→'+cls;
@@ -754,7 +753,7 @@ function renderCal(){
           if(!swInfo&&off.has(sDay)){h+='<td class="off" style="color:#bbb;font-size:13px;">✖</td>';}
           else{
           if(swInfo&&swInfo.type==='moved_in'){
-            h+='<td class="swapped" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'" style="cursor:pointer;" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済・再交換可】&#10;長押しで取り下げ"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
+            h+='<td class="swapped" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'" style="cursor:pointer;" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済】&#10;クリックで取り下げ"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
           }else if(swInfo&&swInfo.type==='removed'){
             h+='<td style="background:#fff3cd;color:#856404;font-size:8px;cursor:pointer;" title="'+swInfo.info+'&#10;クリックで取り下げ" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'">→移動</td>';
           }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'opacity:.45;')+'" '+(canClick?'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" ':'')+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開・交換不可]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
@@ -770,7 +769,7 @@ function renderCal(){
 }
 
 
-function undoSwap(dateStr,teacher,period){
+async function undoSwap(dateStr,teacher,period){
   var found=null,foundIdx=-1;
   for(var i=0;i<swapHistory.length;i++){
     var sw=swapHistory[i];
@@ -790,6 +789,9 @@ function undoSwap(dateStr,teacher,period){
   msg+=(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+') '+found.slotA+' '+found.teacherA+'「'+found.lessonA+'」\n⇄\n';
   msg+=(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+found.slotB+' '+found.teacherB+'「'+found.lessonB+'」';
   if(!confirm(msg))return;
+  // GASからも削除（パスワード不要）
+  var result=await gasGet('deleteSwap',{dateA:found.dateA,periodA:String(found.periodA||''),dateB:found.dateB,periodB:String(found.periodB||''),teacherA:found.teacherA,teacherB:found.teacherB});
+  if(!result||!result.success){console.log('GAS deleteSwap:',result);} // 失敗してもローカルは消す
   swapHistory.splice(foundIdx,1);
   buildCalData();
   renderCal();
@@ -808,11 +810,12 @@ document.getElementById('cal-table').addEventListener('click',function(ev){
 });
 
 // 初期化
-loadEvents().then(function(){renderCal();});
-loadSwapHistory();
 renderM();
-buildCalData();
-renderCal();
+// 非同期データ読み込み後にカレンダー描画
+Promise.all([loadEvents(),loadSwapHistory()]).then(function(){
+  buildCalData();
+  renderCal();
+});
 </script>
 </body>
 </html>
