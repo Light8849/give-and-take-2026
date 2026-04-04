@@ -360,15 +360,23 @@ function subTT(sc,hl,ol){
 async function gasGet(action,params){
   var url=GAS_URL+'?action='+action;
   if(params)Object.entries(params).forEach(function(x){url+='&'+x[0]+'='+encodeURIComponent(x[1]);});
-  try{var r=await fetch(url,{redirect:'follow'});var t=await r.text();return JSON.parse(t);}
-  catch(e){console.log('GAS error:',action,e);return null;}
+  try{
+    var r=await fetch(url,{redirect:'follow',mode:'cors'});
+    if(!r.ok){console.log('GAS HTTP error:',r.status,r.statusText);return null;}
+    var t=await r.text();
+    console.log('GAS response for '+action+':',t.substring(0,200));
+    return JSON.parse(t);
+  }catch(e){
+    console.log('GAS fetch error for '+action+':',e.message||e);
+    return null;
+  }
 }
 
 async function confirmSwap(idx){
   var pw=prompt('管理パスワードを入力してください:');
   if(!pw)return;
   var check=await gasGet('checkPassword',{pw:pw});
-  if(!check||!check.valid){alert('パスワードが違います');return;}
+  if(!check){alert('GASへの通信に失敗しました。ブラウザのコンソール(F12)を確認してください');return;}if(!check.valid){alert('パスワードが違います');return;}
   var s=window._sd,c=s.cands[idx];
   var slotA=DN[s.md]+s.mp,slotB=DN[c.d]+c.p;
   var result=await gasGet('addSwap',{class_name:s.mc,teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,teacherB:c.t,lessonB:c.l,slotB:slotB});
