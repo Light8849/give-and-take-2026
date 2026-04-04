@@ -118,11 +118,11 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v4.0 2026-04-04<br>
+v4.2 2026-04-04<br>
+- Off-day swap: blocked bypass for off-days<br>
+- Triangle swap: click ⚡ cells to re-swap<br>
+- Off-day candidates: gray bg + red warning<br>
 - Single-date swap only (no weekly spread)<br>
-- Triangle swap: re-swap moved lessons ⚡<br>
-- Off-day swap: gray bg + red warning text<br>
-- Calendar: deploy lessons faded (opacity)<br>
 - Confirm button: "確定（教務）" + wait msg
 </p>
 </div></div></div>
@@ -280,8 +280,28 @@ function teacherRow(tn,isPinned){
 
 function clickCell(tn,day,per){
   var e=(byT[tn]||{})[day+'-'+per];
-  if(!e||e.is_deploy||e.teachers.length>1||e.all_classes.length>1)return;
-  document.getElementById('top-info').textContent='選択: '+tn+' '+DN[day]+per+'限「'+e.lesson+'」→'+e.all_classes.join(',');
+  // 通常授業が見つからない場合、交換で移動してきた授業を探す（三角交換用）
+  if(!e){
+    // 全日付のswapMapを走査して、このtn/day/perにmoved_inがないか
+    var found=null;
+    Object.keys(swapMap).forEach(function(ds){
+      var swaps=swapMap[ds];
+      for(var i=0;i<swaps.length;i++){
+        var sw=swaps[i];
+        if(sw.teacher===tn&&sw.period===per&&sw.type==='moved_in'){
+          var dt=new Date(ds);
+          var dowMap={0:0,1:1,2:2,3:3,4:4,5:5,6:6};
+          if(dowMap[dt.getDay()]===day){
+            found={lesson:sw.lesson,class_name:sw.class_name,all_classes:[sw.class_name],teachers:[tn],teacher_codes:[],is_deploy:false,day:day,period:per,subject:'',pcode:''};
+          }
+        }
+      }
+    });
+    if(found)e=found;
+  }
+  if(!e||e.is_deploy||e.teachers.length>1||(e.all_classes&&e.all_classes.length>1))return;
+  var cls=e.all_classes?e.all_classes.join(','):(e.class_name||'');
+  document.getElementById('top-info').textContent='選択: '+tn+' '+DN[day]+per+'限「'+e.lesson+'」→'+cls;
   highlights={};renderM();searchSwap(tn,day,per,e);
 }
 
@@ -296,15 +316,25 @@ function searchSwap(mt,md,mp,me){
     if(ot===mt)return;
     if(o.day===md&&o.period===mp)return;
     var ooff=new Set((offD[ot]||[]).map(Number));
-    // 休日チェック：自分が相手の曜日に行けない場合は除外
-    if(moff.has(o.day))return;
-    // 相手が自分の曜日に休みの場合：候補には入れるが警告フラグ
+    // 休日チェック：警告フラグを立てるが候補から除外しない
+    var mtOffWarning=moff.has(o.day);
     var otOffWarning=ooff.has(md);
+    var offWarnFlag=mtOffWarning||otOffWarning;
+    var offWarnMsg=mtOffWarning?'⚠ あなた('+mt+')が'+DN[o.day]+'曜は週休取得日です':otOffWarning?'⚠ 交換相手('+o.teachers[0]+')が'+DN[md]+'曜は週休取得日です':'';
     var ok=o.day+'-'+o.period;
     if((byT[mt]||{})[ok]||(byT[ot]||{})[mk])return;
-    if(blockedSet[mt]&&blockedSet[mt].has(o.day+'-'+o.period))return;
-    if(blockedSet[ot]&&blockedSet[ot].has(md+'-'+mp))return;
-    cands.push({t:ot,l:o.lesson,sb:o.subject,d:o.day,p:o.period,pc:o.pcode,offWarn:otOffWarning});
+    // blockedチェック: offD由来(休日の曜日全体)なら警告にとどめる
+    var mtBlocked=blockedSet[mt]&&blockedSet[mt].has(ok);
+    var otBlocked=blockedSet[ot]&&blockedSet[ot].has(mk);
+    var mtBlockIsOff=moff.has(o.day);
+    var otBlockIsOff=ooff.has(md);
+    // offD由来でないブロック(会議等)は除外
+    if(mtBlocked&&!mtBlockIsOff)return;
+    if(otBlocked&&!otBlockIsOff)return;
+    // offD由来のブロックは警告に追加
+    if(mtBlocked&&mtBlockIsOff){offWarnFlag=true;offWarnMsg='⚠ '+mt+'が'+DN[o.day]+'曜は週休取得日です';}
+    if(otBlocked&&otBlockIsOff){offWarnFlag=true;offWarnMsg='⚠ '+ot+'が'+DN[md]+'曜は週休取得日です';}
+    cands.push({t:ot,l:o.lesson,sb:o.subject,d:o.day,p:o.period,pc:o.pcode,offWarn:offWarnFlag,offMsg:offWarnMsg});
   });
   document.getElementById('sp').classList.add('open');
   document.getElementById('mw').style.height='calc(100vh - 72px - 55vh)';
@@ -318,7 +348,7 @@ function searchSwap(mt,md,mp,me){
       var bg=SC[c.sb]||'#f8f9fa';
       if(c.offWarn){
         lh+='<div class="si" data-ci="'+i+'" style="background:#e5e7eb;"><span class="sl" style="background:'+bg+';">'+DN[c.d]+c.p+'</span><span style="color:#dc2626;font-weight:700;">'+c.t+'「'+c.l+'」</span>';
-        lh+='<div class="dt" style="color:#dc2626;">⚠ 交換相手が週休取得日です ／ '+mt+'→'+DN[c.d]+c.p+' / '+c.t+'→'+DN[md]+mp+'</div></div>';
+        lh+='<div class="dt" style="color:#dc2626;">'+c.offMsg+' ／ '+mt+'→'+DN[c.d]+c.p+' / '+c.t+'→'+DN[md]+mp+'</div></div>';
       }else{
         lh+='<div class="si" data-ci="'+i+'"><span class="sl" style="background:'+bg+';">'+DN[c.d]+c.p+'</span>'+c.t+'「'+c.l+'」';
         lh+='<div class="dt">'+mt+'→'+DN[c.d]+c.p+' / '+c.t+'→'+DN[md]+mp+'</div></div>';
