@@ -116,12 +116,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v3.1 2026-04-04<br>
-- Fix: swapped cell shows correct lesson name<br>
-- Fix: removed slot shows "→移動" indicator<br>
+v3.3 2026-04-04<br>
+- Swap date: dropdown picker (next 8 weeks)<br>
+- Fix: event date key normalized to YYYY-MM-DD<br>
+- Swapped cell: correct lesson + fluorescent<br>
 - Calendar: 2-week view from today<br>
-- Debug: event loading console logs<br>
-- Swap date input with weekday validation
+- Removed slot shows "→移動" indicator
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -334,7 +334,7 @@ function selCand(i){
   pv+='<div class="pa">⇄</div>';
   pv+='<div class="pc rv"><div class="bg">🟢 '+DN[c.d]+c.p+'限</div>'+c.t+'「'+c.l+'」</div>';
   pv+='<div style="font-size:11px;color:#64748b;padding:0 8px;">対象: '+s.mc+'</div>';
-  pv+='<button onclick="confirmSwap('+i+')" style="padding:6px 16px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 12px;">✅ この交換を確定</button>';
+  pv+='<button onclick="showDatePicker('+i+')" style="padding:6px 16px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 12px;">✅ この交換を確定</button>';
   pv+='</div>';
   document.getElementById('sp-pv').innerHTML=pv;
   highlights={};
@@ -384,21 +384,60 @@ async function gasGet(action,params){
   }
 }
 
-async function confirmSwap(idx){
+function getNextDates(dow,count){
+  var dates=[],d=new Date();
+  var diff=dow-d.getDay();
+  if(diff<0)diff+=7;
+  if(diff===0)diff=0; // 今日がその曜日ならば今日も含む
+  d.setDate(d.getDate()+diff);
+  for(var i=0;i<count;i++){
+    dates.push(new Date(d));
+    d=new Date(d.getTime()+7*86400000);
+  }
+  return dates;
+}
+
+function showDatePicker(idx){
   var s=window._sd,c=s.cands[idx];
-  // 日付入力ダイアログ
-  var today=new Date();
-  var defA=nextDayOfWeek(s.md,today);
-  var defB=nextDayOfWeek(c.d,today);
-  var dateA=prompt('🔴 '+s.mt+'「'+s.me.lesson+'」の交換日（'+DN[s.md]+'曜）を入力:\n例: 2026-04-14',defA);
-  if(!dateA)return;
-  var dateB=prompt('🟢 '+c.t+'「'+c.l+'」の交換日（'+DN[c.d]+'曜）を入力:\n例: 2026-04-15',defB);
-  if(!dateB)return;
-  // 曜日チェック
-  var dA=new Date(dateA),dB=new Date(dateB);
-  var dowMap={1:1,2:2,3:3,4:4,5:5,6:6,0:0};
-  if(dowMap[dA.getDay()]!==s.md){alert('⚠️ '+dateA+'は'+DN[s.md]+'曜日ではありません');return;}
-  if(dowMap[dB.getDay()]!==c.d){alert('⚠️ '+dateB+'は'+DN[c.d]+'曜日ではありません');return;}
+  var datesA=getNextDates(s.md,8);
+  var datesB=getNextDates(c.d,8);
+  var WDAY2=['日','月','火','水','木','金','土'];
+  var optsA='',optsB='';
+  datesA.forEach(function(dt){
+    var ds=dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+    var label=(dt.getMonth()+1)+'/'+dt.getDate()+'('+WDAY2[dt.getDay()]+')';
+    optsA+='<option value="'+ds+'">'+label+'</option>';
+  });
+  datesB.forEach(function(dt){
+    var ds=dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+    var label=(dt.getMonth()+1)+'/'+dt.getDate()+'('+WDAY2[dt.getDay()]+')';
+    optsB+='<option value="'+ds+'">'+label+'</option>';
+  });
+  var mh='<div id="date-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;">';
+  mh+='<div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.3);">';
+  mh+='<h3 style="margin:0 0 16px;font-size:16px;text-align:center;">📅 交換日を選択</h3>';
+  mh+='<div style="margin-bottom:14px;padding:10px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5;">';
+  mh+='<div style="font-size:11px;color:#dc2626;font-weight:700;">🔴 '+s.mt+'「'+s.me.lesson+'」（'+DN[s.md]+s.mp+'限）</div>';
+  mh+='<select id="sel-dateA" style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;">'+optsA+'</select>';
+  mh+='</div>';
+  mh+='<div style="margin-bottom:16px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;">';
+  mh+='<div style="font-size:11px;color:#16a34a;font-weight:700;">🟢 '+c.t+'「'+c.l+'」（'+DN[c.d]+c.p+'限）</div>';
+  mh+='<select id="sel-dateB" style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;">'+optsB+'</select>';
+  mh+='</div>';
+  mh+='<div style="display:flex;gap:10px;justify-content:center;">';
+  mh+='<button onclick="closeDateModal()" style="padding:8px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">キャンセル</button>';
+  mh+='<button onclick="submitSwap('+idx+')" style="padding:8px 20px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">✅ 確定</button>';
+  mh+='</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',mh);
+}
+
+function closeDateModal(){var m=document.getElementById('date-modal');if(m)m.remove();}
+
+async function submitSwap(idx){
+  var s=window._sd,c=s.cands[idx];
+  var dateA=document.getElementById('sel-dateA').value;
+  var dateB=document.getElementById('sel-dateB').value;
+  closeDateModal();
   var pw=prompt('管理パスワードを入力してください:');
   if(!pw)return;
   var check=await gasGet('checkPassword',{pw:pw});
@@ -409,27 +448,29 @@ async function confirmSwap(idx){
   if(result&&result.success){
     swapHistory.push({teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,dateA:dateA,periodA:s.mp,teacherB:c.t,lessonB:c.l,slotB:slotB,dateB:dateB,periodB:c.p,class_name:s.mc});
     buildCalData();
-    alert('✅ 交換を確定しました！\n'+dateA+' '+slotA+' '+s.mt+'「'+s.me.lesson+'」\n⇄\n'+dateB+' '+slotB+' '+c.t+'「'+c.l+'」');
+    var WDAY2=['日','月','火','水','木','金','土'];
+    var dA=new Date(dateA),dB=new Date(dateB);
+    alert('✅ 交換を確定しました！\n'+(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+') '+slotA+' '+s.mt+'「'+s.me.lesson+'」\n⇄\n'+(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+slotB+' '+c.t+'「'+c.l+'」');
     closeSwap();
   }else{alert('エラー: '+(result?JSON.stringify(result):'通信失敗'));}
 }
 
-function nextDayOfWeek(dow,fromDate){
-  var d=new Date(fromDate);
-  var diff=dow-d.getDay();if(diff<=0)diff+=7;
-  d.setDate(d.getDate()+diff);
-  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
-}
-
 async function loadEvents(){
-  console.log('loadEvents: fetching...');
   var d=await gasGet('getEvents');
-  console.log('loadEvents result:',d);
   if(d&&d.events){
-    EVENTS=d.events;
-    console.log('Events loaded:',Object.keys(EVENTS).length,'items');
-  }else{
-    console.log('Events: no data or error');
+    EVENTS={};
+    Object.entries(d.events).forEach(function(x){
+      var k=x[0],v=x[1];
+      // 日付キーをYYYY-MM-DD形式に正規化
+      var dt=new Date(k);
+      if(!isNaN(dt.getTime())){
+        var nk=dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+        EVENTS[nk]=v;
+      }else{
+        EVENTS[k]=v;
+      }
+    });
+    console.log('Events loaded:',Object.keys(EVENTS).length,EVENTS);
   }
 }
 
