@@ -279,10 +279,11 @@ function teacherRow(tn,isPinned){
 }
 
 function clickCell(tn,day,per){
+  console.log('clickCell:',tn,day,per);
   var e=(byT[tn]||{})[day+'-'+per];
+  console.log('byT entry:',e?e.lesson:'none');
   // 通常授業が見つからない場合、交換で移動してきた授業を探す（三角交換用）
   if(!e){
-    // 全日付のswapMapを走査して、このtn/day/perにmoved_inがないか
     var found=null;
     Object.keys(swapMap).forEach(function(ds){
       var swaps=swapMap[ds];
@@ -297,8 +298,9 @@ function clickCell(tn,day,per){
         }
       }
     });
-    if(found)e=found;
+    if(found){e=found;console.log('swapMap found:',e.lesson);}
   }
+  console.log('final e:',e?e.lesson:'none','deploy:',e?e.is_deploy:'','teachers:',e?e.teachers.length:'','classes:',e?(e.all_classes||[]).length:'');
   if(!e||e.is_deploy||e.teachers.length>1||(e.all_classes&&e.all_classes.length>1))return;
   var cls=e.all_classes?e.all_classes.join(','):(e.class_name||'');
   document.getElementById('top-info').textContent='選択: '+tn+' '+DN[day]+per+'限「'+e.lesson+'」→'+cls;
