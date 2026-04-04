@@ -446,6 +446,7 @@ function subTT(sc,hl,ol){
 async function gasGet(action,params){
   var url=GAS_URL+'?action='+action;
   if(params)Object.entries(params).forEach(function(x){url+='&'+x[0]+'='+encodeURIComponent(x[1]);});
+  console.log('GAS REQUEST['+action+']:',url);
   try{
     var r=await fetch(url,{redirect:'follow'});
     var t=await r.text();
