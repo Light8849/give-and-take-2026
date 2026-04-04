@@ -118,12 +118,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v4.2 2026-04-04<br>
+v4.3 2026-04-04<br>
+- Print: date picker before print + dates shown<br>
 - Off-day swap: blocked bypass for off-days<br>
 - Triangle swap: click ⚡ cells to re-swap<br>
 - Off-day candidates: gray bg + red warning<br>
-- Single-date swap only (no weekly spread)<br>
-- Confirm button: "確定（教務）" + wait msg
+- Single-date swap only, confirm "確定（教務）"
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -375,7 +375,7 @@ function selCand(i){
   pv+='<div class="pa">⇄</div>';
   pv+='<div class="pc rv"><div class="bg">🟢 '+DN[c.d]+c.p+'限</div>'+c.t+'「'+c.l+'」</div>';
   pv+='<div style="font-size:11px;color:#64748b;padding:0 8px;">対象: '+s.mc+'</div>';
-  pv+='<button onclick="printSwap()" style="padding:6px 16px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 4px;">🖨 印刷（交換依頼書）</button>';
+  pv+='<button onclick="showPrintDatePicker()" style="padding:6px 16px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 4px;">🖨 印刷（交換依頼書）</button>';
   pv+='<button onclick="showDatePicker('+i+')" style="padding:6px 16px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 4px;">✅ 交換を確定（教務）</button>';
   pv+='</div>';
   document.getElementById('sp-pv').innerHTML=pv;
@@ -559,22 +559,68 @@ function buildCalData(){
   });
 }
 
-function printSwap(){
+function showPrintDatePicker(){
   if(!window._sd)return;
   var actEl=document.querySelector('#sp-ls .si.act');
   if(!actEl){alert('交換候補を選択してから印刷してください');return;}
   var ci=+actEl.dataset.ci,s=window._sd,c=s.cands[ci];
+  var datesA=getNextDates(s.md,8);
+  var datesB=getNextDates(c.d,8);
+  var WDAY2=['日','月','火','水','木','金','土'];
+  var optsA='',optsB='';
+  datesA.forEach(function(dt){
+    var ds=dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+    var label=(dt.getMonth()+1)+'/'+dt.getDate()+'('+WDAY2[dt.getDay()]+')';
+    optsA+='<option value="'+ds+'">'+label+'</option>';
+  });
+  datesB.forEach(function(dt){
+    var ds=dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+    var label=(dt.getMonth()+1)+'/'+dt.getDate()+'('+WDAY2[dt.getDay()]+')';
+    optsB+='<option value="'+ds+'">'+label+'</option>';
+  });
+  var mh='<div id="print-date-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;">';
+  mh+='<div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.3);">';
+  mh+='<h3 style="margin:0 0 16px;font-size:16px;text-align:center;">🖨 交換希望日を選択して印刷</h3>';
+  mh+='<div style="margin-bottom:14px;padding:10px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5;">';
+  mh+='<div style="font-size:11px;color:#dc2626;font-weight:700;">🔴 '+s.mt+'「'+s.me.lesson+'」（'+DN[s.md]+s.mp+'限）</div>';
+  mh+='<select id="print-dateA" style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;">'+optsA+'</select>';
+  mh+='</div>';
+  mh+='<div style="margin-bottom:16px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;">';
+  mh+='<div style="font-size:11px;color:#16a34a;font-weight:700;">🟢 '+c.t+'「'+c.l+'」（'+DN[c.d]+c.p+'限）</div>';
+  mh+='<select id="print-dateB" style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;">'+optsB+'</select>';
+  mh+='</div>';
+  mh+='<div style="display:flex;gap:10px;justify-content:center;">';
+  mh+='<button onclick="closePrintDateModal()" style="padding:8px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">キャンセル</button>';
+  mh+='<button onclick="doPrintWithDates('+ci+')" style="padding:8px 20px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">🖨 印刷</button>';
+  mh+='</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',mh);
+}
+
+function closePrintDateModal(){var m=document.getElementById('print-date-modal');if(m)m.remove();}
+
+function doPrintWithDates(ci){
+  var dateA=document.getElementById('print-dateA').value;
+  var dateB=document.getElementById('print-dateB').value;
+  closePrintDateModal();
+  printSwapWithDates(ci,dateA,dateB);
+}
+
+function printSwapWithDates(ci,dateA,dateB){
+  var s=window._sd,c=s.cands[ci];
   var pa=document.getElementById('print-area');
+  var WDAY2=['日','月','火','水','木','金','土'];
+  var dA=new Date(dateA),dB=new Date(dateB);
+  var dateALabel=(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+')';
+  var dateBLabel=(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+')';
   var h='<div class="print-title">授業交換依頼書</div>';
   h+='<div class="print-subtitle">対象クラス: '+s.mc+'　｜　Give&Take【Max】</div>';
   h+='<div class="print-swap-box">';
-  h+='<div class="print-swap-card give-card"><div class="big">🔴 '+DN[s.md]+s.mp+'限</div><div style="font-size:14px;margin-top:4px;">'+s.mt+'</div><div style="font-size:12px;color:#64748b;">「'+s.me.lesson+'」</div></div>';
+  h+='<div class="print-swap-card give-card"><div class="big">🔴 '+dateALabel+' '+s.mp+'限</div><div style="font-size:14px;margin-top:4px;">'+s.mt+'</div><div style="font-size:12px;color:#64748b;">「'+s.me.lesson+'」</div></div>';
   h+='<div class="print-arrow">⇄</div>';
-  h+='<div class="print-swap-card recv-card"><div class="big">🟢 '+DN[c.d]+c.p+'限</div><div style="font-size:14px;margin-top:4px;">'+c.t+'</div><div style="font-size:12px;color:#64748b;">「'+c.l+'」</div></div>';
+  h+='<div class="print-swap-card recv-card"><div class="big">🟢 '+dateBLabel+' '+c.p+'限</div><div style="font-size:14px;margin-top:4px;">'+c.t+'</div><div style="font-size:12px;color:#64748b;">「'+c.l+'」</div></div>';
   h+='</div>';
   var days=[s.md];
   if(c.d!==s.md)days.push(c.d);
-  // 各セクション：クラス、教員A、教員Bを曜日ごとに横並び
   function dayTable(sc,days2,hlMap,label,off){
     var offSet=new Set((off||[]).map(Number));
     var t='<div class="print-section"><h4>'+label+'</h4><table class="print-tt"><tr><th style="width:50px;">時限</th>';
