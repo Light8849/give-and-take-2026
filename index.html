@@ -112,7 +112,18 @@ table.cal td.holiday-col{background:#fef2f2;}
 <body>
 <div id="pw-screen"><div class="inner"><div style="font-size:48px;">🔒</div><h2>Give&Take【Max】</h2><p>パスワードを入力してください</p>
 <input type="password" id="pw-input" placeholder="パスワード" onkeydown="if(event.key==='Enter')checkPW()"><br>
-<button onclick="checkPW()">ログイン</button><p id="pw-err">パスワードが違います</p></div></div>
+<button onclick="checkPW()">ログイン</button><p id="pw-err">パスワードが違います</p>
+<br><br>
+<div style="text-align:left;max-width:360px;margin:0 auto;">
+<p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
+v3.0 2026-04-04<br>
+- Date-based swap (single-day only)<br>
+- Calendar event sync from GAS<br>
+- Swapped cells: fluorescent green ⚡<br>
+- Regular timetable unchanged in list view<br>
+- Version info on login screen
+</p>
+</div></div></div>
 <div id="app" style="display:none;">
 <div class="topbar"><h1>📅 Give&Take【Max】</h1><div class="info" id="top-info">単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定</div><button onclick="resetAll()">✕ リセット</button></div>
 <div class="filter-bar">
@@ -362,32 +373,52 @@ async function gasGet(action,params){
   var url=GAS_URL+'?action='+action;
   if(params)Object.entries(params).forEach(function(x){url+='&'+x[0]+'='+encodeURIComponent(x[1]);});
   try{
-    var r=await fetch(url,{redirect:'follow',mode:'cors'});
-    if(!r.ok){console.log('GAS HTTP error:',r.status,r.statusText);return null;}
+    var r=await fetch(url,{redirect:'follow'});
     var t=await r.text();
-    console.log('GAS response for '+action+':',t.substring(0,200));
+    console.log('GAS['+action+']:',t.substring(0,300));
+    if(!t||t.charAt(0)!=='{'){console.log('GAS invalid response');return null;}
     return JSON.parse(t);
   }catch(e){
-    console.log('GAS fetch error for '+action+':',e.message||e);
+    console.log('GAS error['+action+']:',e.message||e);
     return null;
   }
 }
 
 async function confirmSwap(idx){
+  var s=window._sd,c=s.cands[idx];
+  // 日付入力ダイアログ
+  var today=new Date();
+  var defA=nextDayOfWeek(s.md,today);
+  var defB=nextDayOfWeek(c.d,today);
+  var dateA=prompt('🔴 '+s.mt+'「'+s.me.lesson+'」の交換日（'+DN[s.md]+'曜）を入力:\n例: 2026-04-14',defA);
+  if(!dateA)return;
+  var dateB=prompt('🟢 '+c.t+'「'+c.l+'」の交換日（'+DN[c.d]+'曜）を入力:\n例: 2026-04-15',defB);
+  if(!dateB)return;
+  // 曜日チェック
+  var dA=new Date(dateA),dB=new Date(dateB);
+  var dowMap={1:1,2:2,3:3,4:4,5:5,6:6,0:0};
+  if(dowMap[dA.getDay()]!==s.md){alert('⚠️ '+dateA+'は'+DN[s.md]+'曜日ではありません');return;}
+  if(dowMap[dB.getDay()]!==c.d){alert('⚠️ '+dateB+'は'+DN[c.d]+'曜日ではありません');return;}
   var pw=prompt('管理パスワードを入力してください:');
   if(!pw)return;
   var check=await gasGet('checkPassword',{pw:pw});
-  if(!check){alert('GASへの通信に失敗しました。ブラウザのコンソール(F12)を確認してください');return;}if(!check.valid){alert('パスワードが違います');return;}
-  var s=window._sd,c=s.cands[idx];
+  if(!check){alert('GASへの通信に失敗しました');return;}
+  if(!check.valid){alert('パスワードが違います');return;}
   var slotA=DN[s.md]+s.mp,slotB=DN[c.d]+c.p;
-  var result=await gasGet('addSwap',{class_name:s.mc,teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,teacherB:c.t,lessonB:c.l,slotB:slotB});
+  var result=await gasGet('addSwap',{class_name:s.mc,teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,dateA:dateA,periodA:s.mp,teacherB:c.t,lessonB:c.l,slotB:slotB,dateB:dateB,periodB:c.p});
   if(result&&result.success){
-    // 交換履歴に追加してカレンダーデータを再構築（一覧は変更しない）
-    swapHistory.push({teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,teacherB:c.t,lessonB:c.l,slotB:slotB,class_name:s.mc});
+    swapHistory.push({teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,dateA:dateA,periodA:s.mp,teacherB:c.t,lessonB:c.l,slotB:slotB,dateB:dateB,periodB:c.p,class_name:s.mc});
     buildCalData();
-    alert('✅ 交換を確定しました！\n'+s.mt+'「'+s.me.lesson+'」→'+slotB+'\n'+c.t+'「'+c.l+'」→'+slotA);
+    alert('✅ 交換を確定しました！\n'+dateA+' '+slotA+' '+s.mt+'「'+s.me.lesson+'」\n⇄\n'+dateB+' '+slotB+' '+c.t+'「'+c.l+'」');
     closeSwap();
   }else{alert('エラー: '+(result?JSON.stringify(result):'通信失敗'));}
+}
+
+function nextDayOfWeek(dow,fromDate){
+  var d=new Date(fromDate);
+  var diff=dow-d.getDay();if(diff<=0)diff+=7;
+  d.setDate(d.getDate()+diff);
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
 }
 
 async function loadEvents(){var d=await gasGet('getEvents');if(d&&d.events){EVENTS=d.events;}}
@@ -399,40 +430,32 @@ async function loadSwapHistory(){
     swapHistory=d.history;buildCalData();if(document.getElementById('cw').style.display!=='none')renderCal();
   }
 }
-// カレンダー用データ（交換適用済み）
-var calByT={},calByC={};
-var swappedSlots=new Set(); // 交換されたスロットを記録（蛍光色表示用）
+// 日付ベースの交換マップ
+// swapMap[dateStr] = [{teacherA,periodA,teacherB,periodB,lessonA,lessonB,class_name}, ...]
+var swapMap={};
 
+
+
+function getSwapForCell(dateStr,teacherName,period){
+  var swaps=swapMap[dateStr];
+  if(!swaps)return null;
+  for(var i=0;i<swaps.length;i++){
+    if(swaps[i].teacher===teacherName && swaps[i].period===period){
+      return swaps[i];
+    }
+  }
+  return null;
+}
 function buildCalData(){
-  // レギュラーデータをディープコピー
-  calByT={};calByC={};swappedSlots=new Set();
-  Object.keys(byT).forEach(function(tn){
-    calByT[tn]={};
-    Object.keys(byT[tn]).forEach(function(k){calByT[tn][k]=byT[tn][k];});
-  });
-  Object.keys(byC).forEach(function(cn){
-    calByC[cn]={};
-    Object.keys(byC[cn]).forEach(function(k){calByC[cn][k]=byC[cn][k];});
-  });
-  // 交換履歴を適用
-  var dnr={'月':1,'火':2,'水':3,'木':4,'金':5,'土':6};
+  swapMap={};
   swapHistory.forEach(function(sw){
-    var sA={day:dnr[sw.slotA.charAt(0)],period:parseInt(sw.slotA.substring(1))};
-    var sB={day:dnr[sw.slotB.charAt(0)],period:parseInt(sw.slotB.substring(1))};
-    if(!sA.day||!sB.day)return;
-    var kA=sA.day+'-'+sA.period,kB=sB.day+'-'+sB.period;
-    var schA=calByT[sw.teacherA],schB=calByT[sw.teacherB];
-    if(!schA||!schB)return;
-    var eA=schA[kA],eB=schB[kB];
-    if(!eA||!eB)return;
-    delete schA[kA];delete schB[kB];
-    var nA=Object.assign({},eA,{day:sB.day,period:sB.period});
-    var nB=Object.assign({},eB,{day:sA.day,period:sA.period});
-    schA[kB]=nA;schB[kA]=nB;
-    if(calByC[sw.class_name]){calByC[sw.class_name][kA]=nB;calByC[sw.class_name][kB]=nA;}
-    // 交換されたスロットを記録
-    swappedSlots.add(sw.teacherA+'_'+kB);
-    swappedSlots.add(sw.teacherB+'_'+kA);
+    if(!sw.dateA||!sw.dateB)return;
+    // dateAの時限periodAを、teacherBのlessonBに差し替え
+    if(!swapMap[sw.dateA])swapMap[sw.dateA]=[];
+    swapMap[sw.dateA].push({teacher:sw.teacherA,period:+sw.periodA,replacedBy:sw.teacherB,lesson:sw.lessonB,origLesson:sw.lessonA,class_name:sw.class_name});
+    // dateBの時限periodBを、teacherAのlessonAに差し替え
+    if(!swapMap[sw.dateB])swapMap[sw.dateB]=[];
+    swapMap[sw.dateB].push({teacher:sw.teacherB,period:+sw.periodB,replacedBy:sw.teacherA,lesson:sw.lessonA,origLesson:sw.lessonB,class_name:sw.class_name});
   });
 }
 
@@ -510,7 +533,7 @@ function renderCal(){
     var tn=v.name,subj=v.subject;
     if(pinnedTeacher===tn)return;
     if(subj!==lastSubj){var bg=SUBJ_BG[subj]||'#334155';var tc=dates.reduce(function(s2,dt){return s2+(dt.getDay()===6?3:8);},0);h+='<tr><td class="subj-label" colspan="'+(tc+1)+'" style="background:'+bg+';color:#fff;height:4px;padding:2px 6px!important;font-size:10px;font-weight:700;border:none;">▸ '+subj+'</td></tr>';lastSubj=subj;}
-    var sc=calByT[tn]||byT[tn]||{},off=new Set((offD[tn]||[]).map(Number));
+    var sc=byT[tn]||{},off=new Set((offD[tn]||[]).map(Number));
     h+='<tr><td class="rn">'+tn+'</td>';
     dates.forEach(function(dt){
       var ds=dateStr(dt),isH=NATIONAL_HOLIDAYS.has(ds),dow=dt.getDay(),sDay={1:1,2:2,3:3,4:4,5:5,6:6}[dow],periods=dow===6?[1,2,3]:[1,2,3,4,5,6,7,8];
@@ -519,7 +542,10 @@ function renderCal(){
         else if(off.has(sDay)){h+='<td class="off" style="color:#bbb;font-size:13px;">✖</td>';}
         else{
           var k=sDay+'-'+p,e=sc[k];
-          if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var isSwapped=swappedSlots.has(tn+'_'+k);h+='<td class="'+(isSwapped?'swapped':'')+'" style="'+(isSwapped?'':'background:'+bg2+';')+(mid?'font-weight:700;':'')+'" title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(isSwapped?'&#10;【交換済】':'')+'">'+(isSwapped?'⚡':'')+'<span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span></td>';}
+          var swInfo=getSwapForCell(ds,tn,p);
+          if(swInfo){
+            h+='<td class="swapped" title="'+swInfo.lesson+'&#10;(元: '+swInfo.origLesson+')&#10;交換相手: '+swInfo.replacedBy+'&#10;【交換済】"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
+          }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+'" title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span></td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
           else{h+='<td class="e"></td>';}
         }
