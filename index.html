@@ -820,7 +820,9 @@ async function undoSwap(dateStr,teacher,period){
   msg+=(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+found.slotB+' '+found.teacherB+'「'+found.lessonB+'」';
   if(!confirm(msg))return;
   // GASからも削除（パスワード不要）
-  var result=await gasGet('deleteSwap',{teacherA:found.teacherA,teacherB:found.teacherB,dateA:found.dateA,dateB:found.dateB});
+  var delParams={teacherA:found.teacherA,teacherB:found.teacherB,dateA:found.dateA,dateB:found.dateB};
+  alert('DEBUG削除パラメータ:\n'+JSON.stringify(delParams,null,2));
+  var result=await gasGet('deleteSwap',delParams);
   if(!result||!result.success){alert('⚠ GASの削除に失敗: '+(result?result.error:'通信エラー'));}
   swapHistory.splice(foundIdx,1);
   buildCalData();
