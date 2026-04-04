@@ -118,12 +118,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v5.0 2026-04-04<br>
-- Fix: undo syncs with GAS (persists on reload)<br>
-- Fix: date-scoped swap lookup (no cross-week)<br>
-- Fix: init order (no empty-state flash)<br>
-- Fix: UI text "click to undo" (was "long press")<br>
-- Triangle + off-day + re-swap fully working
+v5.1 2026-04-04<br>
+- Fix: calendar updates after swap confirm<br>
+- Fix: calendar redraws after panel close<br>
+- Clean: removed debug logs, unused functions<br>
+- Data: holidays 2026-04 to 2027-03<br>
+- Confirm message simplified
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -446,15 +446,12 @@ function subTT(sc,hl,ol){
 async function gasGet(action,params){
   var url=GAS_URL+'?action='+action;
   if(params)Object.entries(params).forEach(function(x){url+='&'+x[0]+'='+encodeURIComponent(x[1]);});
-  console.log('GAS REQUEST['+action+']:',url);
   try{
     var r=await fetch(url,{redirect:'follow'});
     var t=await r.text();
-    console.log('GAS['+action+']:',t.substring(0,300));
-    if(!t||t.charAt(0)!=='{'){console.log('GAS invalid response');return null;}
+    if(!t||t.charAt(0)!=='{'){return null;}
     return JSON.parse(t);
   }catch(e){
-    console.log('GAS error['+action+']:',e.message||e);
     return null;
   }
 }
@@ -523,9 +520,10 @@ async function submitSwap(idx){
   if(result&&result.success){
     swapHistory.push({teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,dateA:dateA,periodA:s.mp,teacherB:c.t,lessonB:c.l,slotB:slotB,dateB:dateB,periodB:c.p,class_name:s.mc});
     buildCalData();
+    renderCal();
     var WDAY2=['日','月','火','水','木','金','土'];
     var dA=new Date(dateA),dB=new Date(dateB);
-    alert('✅ 交換が確定しました！\n1〜2分ほどお待ちください。\n'+(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+') '+slotA+' '+s.mt+'「'+s.me.lesson+'」\n⇄\n'+(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+slotB+' '+c.t+'「'+c.l+'」');
+    alert('✅ 交換が確定しました！\n'+(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+') '+slotA+' '+s.mt+'「'+s.me.lesson+'」\n⇄\n'+(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+slotB+' '+c.t+'「'+c.l+'」');
     closeSwap();
   }else{alert('エラー: '+(result?JSON.stringify(result):'通信失敗'));}
 }
@@ -545,7 +543,6 @@ async function loadEvents(){
         EVENTS[k]=v;
       }
     });
-    console.log('Events loaded:',Object.keys(EVENTS).length,EVENTS);
   }
 }
 
@@ -702,13 +699,13 @@ function subTTPrint(sc,hl,ol){
   h+='</tr></table>';return h;
 }
 
-function closeSwap(){document.getElementById('sp').classList.remove('open');document.getElementById('mw').style.height='calc(100vh - 72px)';document.getElementById('cw').style.height='calc(100vh - 72px)';highlights={};renderM();document.getElementById('top-info').textContent='単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定';}
+function closeSwap(){document.getElementById('sp').classList.remove('open');document.getElementById('mw').style.height='calc(100vh - 72px)';document.getElementById('cw').style.height='calc(100vh - 72px)';renderCal();highlights={};renderM();document.getElementById('top-info').textContent='単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定';}
 function resetAll(){closeSwap();unpin();document.getElementById('f-subj').value='';document.getElementById('f-name').value='';renderM();}
 
 // カレンダー
 var WDAY=['日','月','火','水','木','金','土'];
 var calStart=new Date();
-var NATIONAL_HOLIDAYS=new Set(['2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-09-21','2026-09-22','2026-10-12','2026-11-03','2026-11-23']);
+var NATIONAL_HOLIDAYS=new Set(['2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23','2027-01-01','2027-01-12','2027-02-11','2027-02-23','2027-03-20']);
 
 function switchView(mode){
   if(mode==='table'){document.getElementById('mw').style.display='';document.getElementById('cw').style.display='none';document.getElementById('btn-table').style.cssText='padding:4px 10px;border:1px solid var(--accent);border-radius:5px;font-size:10px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600;';document.getElementById('btn-cal').style.cssText='padding:4px 10px;border:1px solid var(--border);border-radius:5px;font-size:10px;cursor:pointer;background:#fff;';}
@@ -801,7 +798,7 @@ async function undoSwap(dateStr,teacher,period){
   if(!confirm(msg))return;
   // GASからも削除（パスワード不要）
   var result=await gasGet('deleteSwap',{dateA:found.dateA,periodA:String(found.periodA||''),dateB:found.dateB,periodB:String(found.periodB||''),teacherA:found.teacherA,teacherB:found.teacherB});
-  if(!result||!result.success){console.log('GAS deleteSwap:',result);} // 失敗してもローカルは消す
+  // GAS削除失敗してもローカルは消す
   swapHistory.splice(foundIdx,1);
   buildCalData();
   renderCal();
