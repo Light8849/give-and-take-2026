@@ -101,13 +101,12 @@ table.cal td.holiday-col{background:#fef2f2;}
   .print-arrow{font-size:26px;color:#64748b;}
   .print-section{margin-top:14px;page-break-inside:avoid;}
   .print-section h4{font-size:12px;font-weight:700;margin-bottom:4px;border-bottom:2px solid #334155;padding-bottom:3px;}
-  table.print-tt{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:10px;}
+  table.print-tt{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:10px;table-layout:fixed;}
   table.print-tt th{background:#e2e8f0;padding:5px 3px;border:1px solid #94a3b8;font-size:10px;text-align:center;font-weight:600;}
   table.print-tt td{padding:4px 2px;border:1px solid #94a3b8;height:32px;text-align:center;vertical-align:middle;font-size:10px;}
   table.print-tt td.gh-print{background:#fecaca!important;}
   table.print-tt td.rh-print{background:#bbf7d0!important;}
-  .print-sign{margin-top:20px;display:flex;gap:30px;justify-content:center;}
-  .print-sign-box{border-bottom:1px solid #000;width:120px;text-align:center;padding-bottom:4px;font-size:11px;}
+  
 }
 #print-area{display:none;}
 </style>
@@ -119,11 +118,11 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v3.6 2026-04-04<br>
-- Print: target days side-by-side + sign box<br>
+v3.7 2026-04-04<br>
+- Print: fixed column width, aligned layout<br>
+- Print: requester name handwrite field<br>
 - Calendar: larger date &amp; event text<br>
 - Calendar cells clickable for swap search<br>
-- Default view: Calendar (2wk from today)<br>
 - Swap date: dropdown picker (next 8 weeks)
 </p>
 </div></div></div>
@@ -560,9 +559,7 @@ function printSwap(){
   h+=dayTable(byC[s.mc]||{},days,hlC,'📋 '+s.mc,null);
   h+=dayTable(byT[s.mt]||{},days,hlA,'👤 '+s.mt,offD[s.mt]);
   h+=dayTable(byT[c.t]||{},days,hlB,'👤 '+c.t,offD[c.t]);
-  h+='<div class="print-sign"><div><div class="print-sign-box">'+s.mt+'</div><div style="font-size:9px;color:#64748b;text-align:center;margin-top:2px;">署名・捺印</div></div>';
-  h+='<div><div class="print-sign-box">'+c.t+'</div><div style="font-size:9px;color:#64748b;text-align:center;margin-top:2px;">署名・捺印</div></div>';
-  h+='<div><div class="print-sign-box">承認</div><div style="font-size:9px;color:#64748b;text-align:center;margin-top:2px;">教務部</div></div></div>';
+  h+='<div style="margin-top:24px;font-size:13px;">依頼者名：＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿</div>';
   pa.innerHTML=h;window.print();
 }
 function subTTPrint(sc,hl,ol){
