@@ -798,7 +798,7 @@ async function undoSwap(dateStr,teacher,period){
   if(!confirm(msg))return;
   // GASからも削除（パスワード不要）
   var result=await gasGet('deleteSwap',{dateA:found.dateA,periodA:String(found.periodA||''),dateB:found.dateB,periodB:String(found.periodB||''),teacherA:found.teacherA,teacherB:found.teacherB});
-  // GAS削除失敗してもローカルは消す
+  if(!result||!result.success){alert('⚠ GASの削除に失敗: '+(result?JSON.stringify(result):'通信エラー')+'\nリロードすると元に戻ります');}
   swapHistory.splice(foundIdx,1);
   buildCalData();
   renderCal();
