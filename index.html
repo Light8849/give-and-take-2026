@@ -346,12 +346,15 @@ function searchSwap(mt,md,mp,me){
     var offWarnFlag=mtOffWarning||otOffWarning;
     var offWarnMsg=mtOffWarning?'⚠ あなた('+mt+')が'+DN[o.day]+'曜は週休取得日です':otOffWarning?'⚠ 交換相手('+o.teachers[0]+')が'+DN[md]+'曜は週休取得日です':'';
     var ok=o.day+'-'+o.period;
-    // 空きチェック: swapMapでremovedなら空きとみなす
-    var mtHas=!!((byT[mt]||{})[ok]);
-    var otHas=!!((byT[ot]||{})[mk]);
-    // ただし、そのスロットが交換で移動済み(removed)なら空きとして扱う
-    // (全日付を確認する必要があるが、レギュラー時間割ベースのチェックなので
-    //  日付に依存しない簡易チェック: swapHistoryにそのスロットのremovedがあるか)
+    // 空きチェック: 相手の時限に自分が空いているか、自分の時限に相手が空いているか
+    var mtSlot=(byT[mt]||{})[ok];
+    var otSlot=(byT[ot]||{})[mk];
+    // 別クラスの授業がある場合は無条件で除外（空きではない）
+    if(mtSlot&&mtSlot.class_name!==mc)return;
+    if(otSlot&&otSlot.class_name!==mc)return;
+    // 同じクラスの授業がある場合、交換で移動済みなら空きとみなす
+    var mtHas=!!mtSlot;
+    var otHas=!!otSlot;
     if(mtHas&&isSlotSwappedAway(mt,o.day,o.period))mtHas=false;
     if(otHas&&isSlotSwappedAway(ot,md,mp))otHas=false;
     if(mtHas||otHas)return;
