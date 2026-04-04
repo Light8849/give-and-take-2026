@@ -118,12 +118,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v4.3 2026-04-04<br>
-- Print: date picker before print + dates shown<br>
-- Off-day swap: blocked bypass for off-days<br>
-- Triangle swap: click ⚡ cells to re-swap<br>
-- Off-day candidates: gray bg + red warning<br>
-- Single-date swap only, confirm "確定（教務）"
+v4.4 2026-04-04<br>
+- Undo swap: click "→移動" to cancel + pw<br>
+- Re-swap fix: swapped slots treated as free<br>
+- Triangle swap: moved_in cells re-swappable<br>
+- Print: date picker + dates on printout<br>
+- Off-day swap with gray+red warning
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -305,6 +305,23 @@ function clickCell(tn,day,per){
   highlights={};renderM();searchSwap(tn,day,per,e);
 }
 
+
+// 指定教員のスロットが交換で移動済みかチェック（少なくとも1件あればtrue）
+function isSlotSwappedAway(teacher,day,period){
+  for(var i=0;i<swapHistory.length;i++){
+    var sw=swapHistory[i];
+    if(!sw.dateA||!sw.dateB)continue;
+    var dnr2={'月':1,'火':2,'水':3,'木':4,'金':5,'土':6};
+    var slotAday=dnr2[sw.slotA.charAt(0)],slotAper=parseInt(sw.slotA.substring(1));
+    var slotBday=dnr2[sw.slotB.charAt(0)],slotBper=parseInt(sw.slotB.substring(1));
+    // teacherAのslotAが移動済み
+    if(sw.teacherA===teacher&&slotAday===day&&slotAper===period)return true;
+    // teacherBのslotBが移動済み
+    if(sw.teacherB===teacher&&slotBday===day&&slotBper===period)return true;
+  }
+  return false;
+}
+
 function searchSwap(mt,md,mp,me){
   var mc=me.all_classes[0],mk=md+'-'+mp;
   var moff=new Set((offD[mt]||[]).map(Number));
@@ -322,7 +339,15 @@ function searchSwap(mt,md,mp,me){
     var offWarnFlag=mtOffWarning||otOffWarning;
     var offWarnMsg=mtOffWarning?'⚠ あなた('+mt+')が'+DN[o.day]+'曜は週休取得日です':otOffWarning?'⚠ 交換相手('+o.teachers[0]+')が'+DN[md]+'曜は週休取得日です':'';
     var ok=o.day+'-'+o.period;
-    if((byT[mt]||{})[ok]||(byT[ot]||{})[mk])return;
+    // 空きチェック: swapMapでremovedなら空きとみなす
+    var mtHas=!!((byT[mt]||{})[ok]);
+    var otHas=!!((byT[ot]||{})[mk]);
+    // ただし、そのスロットが交換で移動済み(removed)なら空きとして扱う
+    // (全日付を確認する必要があるが、レギュラー時間割ベースのチェックなので
+    //  日付に依存しない簡易チェック: swapHistoryにそのスロットのremovedがあるか)
+    if(mtHas&&isSlotSwappedAway(mt,o.day,o.period))mtHas=false;
+    if(otHas&&isSlotSwappedAway(ot,md,mp))otHas=false;
+    if(mtHas||otHas)return;
     // blockedチェック: offD由来(休日の曜日全体)なら警告にとどめる
     var mtBlocked=blockedSet[mt]&&blockedSet[mt].has(ok);
     var otBlocked=blockedSet[ot]&&blockedSet[ot].has(mk);
@@ -719,9 +744,9 @@ function renderCal(){
           var k=sDay+'-'+p,e=sc[k];
           var swInfo=getSwapForCell(ds,tn,p);
           if(swInfo&&swInfo.type==='moved_in'){
-            h+='<td class="swapped" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" style="cursor:pointer;" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済・再交換可】"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
+            h+='<td class="swapped" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'" style="cursor:pointer;" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済・再交換可】&#10;長押しで取り下げ"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
           }else if(swInfo&&swInfo.type==='removed'){
-            h+='<td style="background:#fff3cd;color:#856404;font-size:8px;" title="'+swInfo.info+'">→移動</td>';
+            h+='<td style="background:#fff3cd;color:#856404;font-size:8px;cursor:pointer;" title="'+swInfo.info+'&#10;クリックで取り下げ" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'">→移動</td>';
           }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'opacity:.45;')+'" '+(canClick?'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" ':'')+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開・交換不可]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
           else{h+='<td class="e"></td>';}
@@ -734,8 +759,40 @@ function renderCal(){
   document.getElementById('cal-table').innerHTML=h;
 }
 
+
+function undoSwap(dateStr,teacher,period){
+  var found=null,foundIdx=-1;
+  for(var i=0;i<swapHistory.length;i++){
+    var sw=swapHistory[i];
+    if(!sw.dateA||!sw.dateB)continue;
+    var pA=+sw.periodA,pB=+sw.periodB;
+    if((sw.dateA===dateStr&&sw.teacherA===teacher&&pA===period)||
+       (sw.dateB===dateStr&&sw.teacherB===teacher&&pB===period)||
+       (sw.dateA===dateStr&&sw.teacherB===teacher&&pA===period)||
+       (sw.dateB===dateStr&&sw.teacherA===teacher&&pB===period)){
+      found=sw;foundIdx=i;break;
+    }
+  }
+  if(!found){alert('該当する交換が見つかりません');return;}
+  var WDAY2=['日','月','火','水','木','金','土'];
+  var dA=new Date(found.dateA),dB=new Date(found.dateB);
+  var msg='この交換を取り下げますか？\n\n';
+  msg+=(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+') '+found.slotA+' '+found.teacherA+'「'+found.lessonA+'」\n⇄\n';
+  msg+=(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+found.slotB+' '+found.teacherB+'「'+found.lessonB+'」';
+  if(!confirm(msg))return;
+  swapHistory.splice(foundIdx,1);
+  buildCalData();
+  renderCal();
+  alert('✅ 元に戻しました');
+}
 // カレンダーのクリック
 document.getElementById('cal-table').addEventListener('click',function(ev){
+  var undoTd=ev.target.closest('td[data-undo]');
+  if(undoTd&&!undoTd.dataset.t){
+    // →移動セル（data-tなし）をクリック → 取り下げ
+    undoSwap(undoTd.dataset.undo,undoTd.dataset.undoT,+undoTd.dataset.undoP);
+    return;
+  }
   var td=ev.target.closest('td[data-t]');
   if(td){clickCell(td.dataset.t,+td.dataset.d,+td.dataset.p);}
 });
