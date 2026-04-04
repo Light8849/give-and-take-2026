@@ -116,12 +116,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v3.0 2026-04-04<br>
-- Date-based swap (single-day only)<br>
-- Calendar event sync from GAS<br>
-- Swapped cells: fluorescent green ⚡<br>
-- Regular timetable unchanged in list view<br>
-- Version info on login screen
+v3.1 2026-04-04<br>
+- Fix: swapped cell shows correct lesson name<br>
+- Fix: removed slot shows "→移動" indicator<br>
+- Calendar: 2-week view from today<br>
+- Debug: event loading console logs<br>
+- Swap date input with weekday validation
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -137,7 +137,7 @@ v3.0 2026-04-04<br>
   <div class="pinned-info" id="pin-info">📌 <span id="pin-name"></span><button onclick="unpin()">✕</button></div>
 </div>
 <div class="main-wrap" id="mw"></div>
-<div class="cal-wrap" id="cw" style="display:none;"><div class="cal-header"><button onclick="calPrev()">◀ 前の8週</button><span class="cal-range" id="cal-range"></span><button onclick="calNext()">次の8週 ▶</button></div><div id="cal-table"></div></div>
+<div class="cal-wrap" id="cw" style="display:none;"><div class="cal-header"><button onclick="calPrev()">◀ 前の2週</button><span class="cal-range" id="cal-range"></span><button onclick="calNext()">次の2週 ▶</button></div><div id="cal-table"></div></div>
 <div id="print-area"></div>
 <div class="sp" id="sp"><div class="sp-h"><h3 id="sp-t">交換候補</h3><button onclick="printSwap()" style="background:#2563eb;">🖨 印刷</button><button onclick="closeSwap()">✕ 閉じる</button></div><div id="sp-pv"></div><div class="sp-b"><div class="sp-l" id="sp-ls"></div><div class="sp-r" id="sp-dt"></div></div></div>
 </div>
@@ -421,7 +421,17 @@ function nextDayOfWeek(dow,fromDate){
   return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
 }
 
-async function loadEvents(){var d=await gasGet('getEvents');if(d&&d.events){EVENTS=d.events;}}
+async function loadEvents(){
+  console.log('loadEvents: fetching...');
+  var d=await gasGet('getEvents');
+  console.log('loadEvents result:',d);
+  if(d&&d.events){
+    EVENTS=d.events;
+    console.log('Events loaded:',Object.keys(EVENTS).length,'items');
+  }else{
+    console.log('Events: no data or error');
+  }
+}
 
 var swapHistory=[];
 async function loadSwapHistory(){
@@ -439,23 +449,30 @@ var swapMap={};
 function getSwapForCell(dateStr,teacherName,period){
   var swaps=swapMap[dateStr];
   if(!swaps)return null;
+  var result=null;
   for(var i=0;i<swaps.length;i++){
     if(swaps[i].teacher===teacherName && swaps[i].period===period){
-      return swaps[i];
+      if(swaps[i].type==='moved_in')return swaps[i]; // 移動先を優先
+      result=swaps[i];
     }
   }
-  return null;
+  return result;
 }
 function buildCalData(){
   swapMap={};
   swapHistory.forEach(function(sw){
     if(!sw.dateA||!sw.dateB)return;
-    // dateAの時限periodAを、teacherBのlessonBに差し替え
+    var pA=+sw.periodA,pB=+sw.periodB;
+    // dateA: teacherAのperiodAから授業を消す
     if(!swapMap[sw.dateA])swapMap[sw.dateA]=[];
-    swapMap[sw.dateA].push({teacher:sw.teacherA,period:+sw.periodA,replacedBy:sw.teacherB,lesson:sw.lessonB,origLesson:sw.lessonA,class_name:sw.class_name});
-    // dateBの時限periodBを、teacherAのlessonAに差し替え
+    swapMap[sw.dateA].push({teacher:sw.teacherA,period:pA,type:'removed',info:sw.lessonA+' → '+sw.dateB+DN[new Date(sw.dateB).getDay()===0?7:new Date(sw.dateB).getDay()]+pB+'限へ'});
+    // dateA: teacherBのperiodAにlessonBを移動（元はdateB/periodBにあった）
+    swapMap[sw.dateA].push({teacher:sw.teacherB,period:pA,type:'moved_in',lesson:sw.lessonB,from:sw.dateB,class_name:sw.class_name});
+    // dateB: teacherBのperiodBから授業を消す
     if(!swapMap[sw.dateB])swapMap[sw.dateB]=[];
-    swapMap[sw.dateB].push({teacher:sw.teacherB,period:+sw.periodB,replacedBy:sw.teacherA,lesson:sw.lessonA,origLesson:sw.lessonB,class_name:sw.class_name});
+    swapMap[sw.dateB].push({teacher:sw.teacherB,period:pB,type:'removed',info:sw.lessonB+' → '+sw.dateA+DN[new Date(sw.dateA).getDay()===0?7:new Date(sw.dateA).getDay()]+pA+'限へ'});
+    // dateB: teacherAのperiodBにlessonAを移動（元はdateA/periodAにあった）
+    swapMap[sw.dateB].push({teacher:sw.teacherA,period:pB,type:'moved_in',lesson:sw.lessonA,from:sw.dateA,class_name:sw.class_name});
   });
 }
 
@@ -494,7 +511,7 @@ function resetAll(){closeSwap();unpin();document.getElementById('f-subj').value=
 
 // カレンダー
 var WDAY=['日','月','火','水','木','金','土'];
-var calStart=new Date('2026-04-06');
+var calStart=new Date();
 var NATIONAL_HOLIDAYS=new Set(['2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-09-21','2026-09-22','2026-10-12','2026-11-03','2026-11-23']);
 
 function switchView(mode){
@@ -503,13 +520,13 @@ function switchView(mode){
 }
 function pad2(n){return n<10?'0'+n:''+n;}
 function dateStr(dt){return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());}
-function calPrev(){calStart=new Date(calStart.getTime()-56*86400000);renderCal();}
-function calNext(){calStart=new Date(calStart.getTime()+56*86400000);renderCal();}
+function calPrev(){calStart=new Date(calStart.getTime()-14*86400000);renderCal();}
+function calNext(){calStart=new Date(calStart.getTime()+14*86400000);renderCal();}
 
 function get8WeekDates(start){
   var dates=[],d=new Date(start);
   while(d.getDay()!==1)d=new Date(d.getTime()-86400000);
-  for(var w=0;w<8;w++){for(var i=0;i<6;i++){dates.push(new Date(d));d=new Date(d.getTime()+86400000);}d=new Date(d.getTime()+86400000);}
+  for(var w=0;w<2;w++){for(var i=0;i<6;i++){dates.push(new Date(d));d=new Date(d.getTime()+86400000);}d=new Date(d.getTime()+86400000);}
   return dates;
 }
 
@@ -543,8 +560,10 @@ function renderCal(){
         else{
           var k=sDay+'-'+p,e=sc[k];
           var swInfo=getSwapForCell(ds,tn,p);
-          if(swInfo){
-            h+='<td class="swapped" title="'+swInfo.lesson+'&#10;(元: '+swInfo.origLesson+')&#10;交換相手: '+swInfo.replacedBy+'&#10;【交換済】"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
+          if(swInfo&&swInfo.type==='moved_in'){
+            h+='<td class="swapped" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済】"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
+          }else if(swInfo&&swInfo.type==='removed'){
+            h+='<td style="background:#fff3cd;color:#856404;font-size:8px;" title="'+swInfo.info+'">→移動</td>';
           }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+'" title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span></td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
           else{h+='<td class="e"></td>';}
