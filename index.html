@@ -122,7 +122,7 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v5.5 2026-04-05 12:08<br>
+v5.6 2026-04-05 12:14<br>
 - Fix: undo saves datetime from GAS response<br>
 - Fix: undo fallback when datetime missing<br>
 - Button: "移動（教務・手差し替え）"<br>
@@ -820,8 +820,8 @@ async function undoSwap(dateStr,teacher,period){
   msg+=(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+found.slotB+' '+found.teacherB+'「'+found.lessonB+'」';
   if(!confirm(msg))return;
   // GASからも削除（パスワード不要）
-  var result=await gasGet('deleteSwap',{datetime:found.datetime||'',dateA:found.dateA,periodA:String(found.periodA||''),dateB:found.dateB,periodB:String(found.periodB||''),teacherA:found.teacherA,teacherB:found.teacherB});
-  if(!result||!result.success){alert('⚠ GASの削除に失敗\n送信datetime: '+(found.datetime||'なし')+'\nteacherA: '+found.teacherA+'\n'+(result?JSON.stringify(result):'通信エラー'));}
+  var result=await gasGet('deleteSwap',{teacherA:found.teacherA,teacherB:found.teacherB,dateA:found.dateA,dateB:found.dateB});
+  if(!result||!result.success){alert('⚠ GASの削除に失敗: '+(result?result.error:'通信エラー'));}
   swapHistory.splice(foundIdx,1);
   buildCalData();
   renderCal();
