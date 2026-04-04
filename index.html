@@ -88,24 +88,26 @@ table.cal td.holiday-col{background:#fef2f2;}
 #pw-err{color:#ef4444;font-size:12px;margin-top:10px;display:none;}
 @media print{
   #pw-screen,.topbar,.filter-bar,.sp,#app>.main-wrap,#app>.cal-wrap{display:none!important;}
-  #print-area{display:block!important;padding:10mm;}
-  @page{size:A4 landscape;margin:8mm;}
-  .print-title{font-size:16px;font-weight:700;text-align:center;margin-bottom:6px;}
-  .print-subtitle{font-size:11px;text-align:center;margin-bottom:10px;color:#64748b;}
-  .print-swap-box{display:flex;gap:12px;align-items:center;justify-content:center;margin:10px 0;font-size:12px;}
-  .print-swap-card{border-radius:6px;padding:6px 14px;text-align:center;}
+  #print-area{display:block!important;padding:8mm;}
+  @page{size:A4 portrait;margin:10mm;}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  .print-title{font-size:18px;font-weight:700;text-align:center;margin-bottom:4px;}
+  .print-subtitle{font-size:12px;text-align:center;margin-bottom:10px;color:#64748b;}
+  .print-swap-box{display:flex;gap:16px;align-items:center;justify-content:center;margin:12px 0;}
+  .print-swap-card{border-radius:8px;padding:10px 20px;text-align:center;}
   .print-swap-card.give-card{background:#fecaca;border:2px solid #dc2626;}
   .print-swap-card.recv-card{background:#bbf7d0;border:2px solid #16a34a;}
-  .print-swap-card .big{font-size:15px;font-weight:700;}
-  .print-arrow{font-size:22px;color:#64748b;}
-  .print-tables{display:flex;gap:8px;flex-wrap:wrap;}
-  .print-section{flex:1;min-width:30%;page-break-inside:avoid;}
-  .print-section h4{font-size:10px;margin-bottom:3px;border-bottom:1px solid #94a3b8;padding-bottom:2px;}
-  table.print-tt{border-collapse:collapse;width:100%;font-size:8px;margin-bottom:8px;}
-  table.print-tt th{background:#e2e8f0;padding:2px 1px;border:1px solid #94a3b8;font-size:7px;text-align:center;}
-  table.print-tt td{padding:2px;border:1px solid #94a3b8;height:22px;text-align:center;vertical-align:middle;font-size:7px;}
-  table.print-tt td.gh-print{background:#fecaca!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  table.print-tt td.rh-print{background:#bbf7d0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .print-swap-card .big{font-size:18px;font-weight:700;}
+  .print-arrow{font-size:26px;color:#64748b;}
+  .print-section{margin-top:14px;page-break-inside:avoid;}
+  .print-section h4{font-size:12px;font-weight:700;margin-bottom:4px;border-bottom:2px solid #334155;padding-bottom:3px;}
+  table.print-tt{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:10px;}
+  table.print-tt th{background:#e2e8f0;padding:5px 3px;border:1px solid #94a3b8;font-size:10px;text-align:center;font-weight:600;}
+  table.print-tt td{padding:4px 2px;border:1px solid #94a3b8;height:32px;text-align:center;vertical-align:middle;font-size:10px;}
+  table.print-tt td.gh-print{background:#fecaca!important;}
+  table.print-tt td.rh-print{background:#bbf7d0!important;}
+  .print-sign{margin-top:20px;display:flex;gap:30px;justify-content:center;}
+  .print-sign-box{border-bottom:1px solid #000;width:120px;text-align:center;padding-bottom:4px;font-size:11px;}
 }
 #print-area{display:none;}
 </style>
@@ -117,11 +119,11 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v3.4 2026-04-04<br>
+v3.5 2026-04-04<br>
+- Print: A4 portrait, day-column layout + sign<br>
+- Calendar cells clickable for swap search<br>
 - Default view: Calendar (2wk from today)<br>
-- Print: A4 landscape, 3 timetables side-by-side<br>
-- Button order: Print first, Confirm second<br>
-- Calendar starts from today, 14 days ahead<br>
+- Button order: Print → Confirm<br>
 - Swap date: dropdown picker (next 8 weeks)
 </p>
 </div></div></div>
@@ -304,6 +306,7 @@ function searchSwap(mt,md,mp,me){
   });
   document.getElementById('sp').classList.add('open');
   document.getElementById('mw').style.height='calc(100vh - 72px - 55vh)';
+  document.getElementById('cw').style.height='calc(100vh - 72px - 55vh)';
   document.getElementById('sp-t').textContent=mt+' '+DN[md]+mp+'限「'+me.lesson+'」('+mc+') → 交換候補'+cands.length+'件';
   var lh='';
   if(!cands.length){lh='<div style="padding:16px;color:#dc2626;">交換可能な相手がいません</div>';}
@@ -525,16 +528,44 @@ function printSwap(){
   if(!actEl){alert('交換候補を選択してから印刷してください');return;}
   var ci=+actEl.dataset.ci,s=window._sd,c=s.cands[ci];
   var pa=document.getElementById('print-area');
-  var h='<div class="print-title">Give&Take【Max】─ 授業交換確認書</div>';
-  h+='<div class="print-subtitle">対象クラス: '+s.mc+'</div>';
-  h+='<div class="print-swap-box"><div class="print-swap-card give-card"><div class="big">🔴 '+DN[s.md]+s.mp+'限</div>'+s.mt+'<br>「'+s.me.lesson+'」</div>';
+  var h='<div class="print-title">授業交換依頼書</div>';
+  h+='<div class="print-subtitle">対象クラス: '+s.mc+'　｜　Give&Take【Max】</div>';
+  // 交換概要
+  h+='<div class="print-swap-box">';
+  h+='<div class="print-swap-card give-card"><div class="big">🔴 '+DN[s.md]+s.mp+'限</div><div style="font-size:13px;margin-top:4px;">'+s.mt+'</div><div style="font-size:12px;color:#64748b;">「'+s.me.lesson+'」</div></div>';
   h+='<div class="print-arrow">⇄</div>';
-  h+='<div class="print-swap-card recv-card"><div class="big">🟢 '+DN[c.d]+c.p+'限</div>'+c.t+'<br>「'+c.l+'」</div></div>';
-  h+='<div class="print-tables">';
-  h+='<div class="print-section"><h4>📋 '+s.mc+'</h4>'+subTTPrint(byC[s.mc]||{},{[s.md+'-'+s.mp]:'gh-print',[c.d+'-'+c.p]:'rh-print'})+'</div>';
-  h+='<div class="print-section"><h4>👤 '+s.mt+'</h4>'+subTTPrint(byT[s.mt]||{},{[s.md+'-'+s.mp]:'gh-print',[c.d+'-'+c.p]:'rh-print'},offD[s.mt])+'</div>';
-  h+='<div class="print-section"><h4>👤 '+c.t+'</h4>'+subTTPrint(byT[c.t]||{},{[c.d+'-'+c.p]:'gh-print',[s.md+'-'+s.mp]:'rh-print'},offD[c.t])+'</div>';
+  h+='<div class="print-swap-card recv-card"><div class="big">🟢 '+DN[c.d]+c.p+'限</div><div style="font-size:13px;margin-top:4px;">'+c.t+'</div><div style="font-size:12px;color:#64748b;">「'+c.l+'」</div></div>';
   h+='</div>';
+  // 各時間割：該当曜日だけ1日分を縦表示
+  function dayColumn(sc,day,hlPeriod,hlClass,label,off){
+    var offSet=new Set((off||[]).map(Number));
+    var maxP=day===6?3:8;
+    var t='<div class="print-section"><h4>'+label+' ─ '+DN[day]+'曜日</h4>';
+    t+='<table class="print-tt"><tr><th style="width:40px;">時限</th><th>授業</th><th>クラス</th></tr>';
+    for(var p=1;p<=maxP;p++){
+      var k=day+'-'+p,e=sc[k];
+      var hl=p===hlPeriod?hlClass:'';
+      if(offSet.has(day)){
+        t+='<tr><td>'+p+'</td><td class="'+hl+'" style="color:#bbb;">休</td><td></td></tr>';
+      }else if(e){
+        t+='<tr><td>'+p+'</td><td class="'+hl+'" style="font-weight:'+(hl?'700':'400')+';">'+e.lesson+'</td><td>'+e.all_classes.join(',').replace(/中学/g,'中')+'</td></tr>';
+      }else{
+        t+='<tr><td>'+p+'</td><td class="'+hl+'"></td><td></td></tr>';
+      }
+    }
+    t+='</table></div>';
+    return t;
+  }
+  // 教員Aの該当曜日2つ
+  h+=dayColumn(byT[s.mt]||{},s.md,s.mp,'gh-print','👤 '+s.mt,offD[s.mt]);
+  if(s.md!==c.d) h+=dayColumn(byT[s.mt]||{},c.d,null,'','👤 '+s.mt,offD[s.mt]);
+  // 教員Bの該当曜日2つ
+  h+=dayColumn(byT[c.t]||{},c.d,c.p,'rh-print','👤 '+c.t,offD[c.t]);
+  if(s.md!==c.d) h+=dayColumn(byT[c.t]||{},s.md,null,'','👤 '+c.t,offD[c.t]);
+  // 署名欄
+  h+='<div class="print-sign"><div><div class="print-sign-box">'+s.mt+'</div><div style="font-size:9px;color:#64748b;text-align:center;margin-top:2px;">署名・捺印</div></div>';
+  h+='<div><div class="print-sign-box">'+c.t+'</div><div style="font-size:9px;color:#64748b;text-align:center;margin-top:2px;">署名・捺印</div></div>';
+  h+='<div><div class="print-sign-box">承認</div><div style="font-size:9px;color:#64748b;text-align:center;margin-top:2px;">教務部</div></div></div>';
   pa.innerHTML=h;window.print();
 }
 function subTTPrint(sc,hl,ol){
@@ -551,7 +582,7 @@ function subTTPrint(sc,hl,ol){
   h+='</tr></table>';return h;
 }
 
-function closeSwap(){document.getElementById('sp').classList.remove('open');document.getElementById('mw').style.height='calc(100vh - 72px)';highlights={};renderM();document.getElementById('top-info').textContent='単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定';}
+function closeSwap(){document.getElementById('sp').classList.remove('open');document.getElementById('mw').style.height='calc(100vh - 72px)';document.getElementById('cw').style.height='calc(100vh - 72px)';highlights={};renderM();document.getElementById('top-info').textContent='単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定';}
 function resetAll(){closeSwap();unpin();document.getElementById('f-subj').value='';document.getElementById('f-name').value='';renderM();}
 
 // カレンダー
@@ -613,7 +644,7 @@ function renderCal(){
             h+='<td class="swapped" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済】"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
           }else if(swInfo&&swInfo.type==='removed'){
             h+='<td style="background:#fff3cd;color:#856404;font-size:8px;" title="'+swInfo.info+'">→移動</td>';
-          }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+'" title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span></td>';}
+          }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'')+'" '+(canClick?'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" ':'')+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
           else{h+='<td class="e"></td>';}
         }
@@ -624,6 +655,12 @@ function renderCal(){
   h+='</tbody></table>';
   document.getElementById('cal-table').innerHTML=h;
 }
+
+// カレンダーのクリック
+document.getElementById('cal-table').addEventListener('click',function(ev){
+  var td=ev.target.closest('td[data-t]');
+  if(td){clickCell(td.dataset.t,+td.dataset.d,+td.dataset.p);}
+});
 
 // 初期化
 loadEvents().then(function(){renderCal();});
