@@ -118,12 +118,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v4.4 2026-04-04<br>
-- Undo swap: click "→移動" to cancel + pw<br>
-- Re-swap fix: swapped slots treated as free<br>
-- Triangle swap: moved_in cells re-swappable<br>
-- Print: date picker + dates on printout<br>
-- Off-day swap with gray+red warning
+v4.5 2026-04-04<br>
+- Fix: dateA/B normalized from GAS response<br>
+- Fix: off-day cells show swapped lessons<br>
+- Undo swap: click "→移動" to cancel (no pw)<br>
+- Re-swap: swapped slots treated as free<br>
+- Triangle swap + off-day swap with warning
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -545,7 +545,13 @@ var swapHistory=[];
 async function loadSwapHistory(){
   var d=await gasGet('getSwapHistory');
   if(d&&d.history&&d.history.length>0){
-    swapHistory=d.history;buildCalData();if(document.getElementById('cw').style.display!=='none')renderCal();
+    swapHistory=d.history.map(function(sw){
+      // dateA/dateBをYYYY-MM-DD形式に正規化（GASが日付型で返す場合対応）
+      if(sw.dateA){var dtA=new Date(sw.dateA);if(!isNaN(dtA.getTime()))sw.dateA=dtA.getFullYear()+'-'+pad2(dtA.getMonth()+1)+'-'+pad2(dtA.getDate());}
+      if(sw.dateB){var dtB=new Date(sw.dateB);if(!isNaN(dtB.getTime()))sw.dateB=dtB.getFullYear()+'-'+pad2(dtB.getMonth()+1)+'-'+pad2(dtB.getDate());}
+      return sw;
+    });
+    buildCalData();if(document.getElementById('cw').style.display!=='none')renderCal();
   }
 }
 // 日付ベースの交換マップ
