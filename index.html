@@ -739,10 +739,12 @@ function renderCal(){
       var ds=dateStr(dt),isH=NATIONAL_HOLIDAYS.has(ds),dow=dt.getDay(),sDay={1:1,2:2,3:3,4:4,5:5,6:6}[dow],periods=dow===6?[1,2,3]:[1,2,3,4,5,6,7,8];
       periods.forEach(function(p){
         if(isH){h+='<td class="holiday-col"></td>';}
-        else if(off.has(sDay)){h+='<td class="off" style="color:#bbb;font-size:13px;">✖</td>';}
         else{
           var k=sDay+'-'+p,e=sc[k];
           var swInfo=getSwapForCell(ds,tn,p);
+          // バツ印でも交換が入っていれば蛍光色で表示
+          if(!swInfo&&off.has(sDay)){h+='<td class="off" style="color:#bbb;font-size:13px;">✖</td>';}
+          else{
           if(swInfo&&swInfo.type==='moved_in'){
             h+='<td class="swapped" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'" style="cursor:pointer;" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済・再交換可】&#10;長押しで取り下げ"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
           }else if(swInfo&&swInfo.type==='removed'){
@@ -750,7 +752,7 @@ function renderCal(){
           }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'opacity:.45;')+'" '+(canClick?'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" ':'')+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開・交換不可]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
           else{h+='<td class="e"></td>';}
-        }
+        }}
       });
     });
     h+='</tr>';
