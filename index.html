@@ -33,6 +33,7 @@ td.off{background:var(--off);color:#bbb;font-size:13px;}
 td.gh{background:var(--give)!important;outline:2px solid #dc2626!important;}
 td.rh{background:var(--receive)!important;outline:2px solid #16a34a!important;}
 td.dep{opacity:.55;}
+td.swapped{background:#00ff88!important;outline:2px solid #00cc66!important;}
 td .n{font-weight:500;font-size:10px;line-height:1.1;display:block;}
 td .s{font-size:9px;color:#64748b;line-height:1;display:block;}
 td .d{font-size:7px;color:#7c3aed;}
@@ -381,35 +382,46 @@ async function confirmSwap(idx){
   var slotA=DN[s.md]+s.mp,slotB=DN[c.d]+c.p;
   var result=await gasGet('addSwap',{class_name:s.mc,teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,teacherB:c.t,lessonB:c.l,slotB:slotB});
   if(result&&result.success){
-    var kA=s.md+'-'+s.mp,kB=c.d+'-'+c.p;
-    var eA=byT[s.mt][kA],eB=byT[c.t][kB];
-    delete byT[s.mt][kA];delete byT[c.t][kB];
-    var nA=Object.assign({},eA,{day:c.d,period:c.p});
-    var nB=Object.assign({},eB,{day:s.md,period:s.mp});
-    byT[s.mt][kB]=nA;byT[c.t][kA]=nB;
-    if(byC[s.mc]){byC[s.mc][kA]=nB;byC[s.mc][kB]=nA;}
+    // 交換履歴に追加してカレンダーデータを再構築（一覧は変更しない）
+    swapHistory.push({teacherA:s.mt,lessonA:s.me.lesson,slotA:slotA,teacherB:c.t,lessonB:c.l,slotB:slotB,class_name:s.mc});
+    buildCalData();
     alert('✅ 交換を確定しました！\n'+s.mt+'「'+s.me.lesson+'」→'+slotB+'\n'+c.t+'「'+c.l+'」→'+slotA);
     closeSwap();
   }else{alert('エラー: '+(result?JSON.stringify(result):'通信失敗'));}
 }
 
-async function loadEvents(){var d=await gasGet('getEvents');if(d&&d.events){EVENTS=d.events;if(document.getElementById('cw').style.display!=='none')renderCal();}}
+async function loadEvents(){var d=await gasGet('getEvents');if(d&&d.events){EVENTS=d.events;}}
 
 var swapHistory=[];
 async function loadSwapHistory(){
   var d=await gasGet('getSwapHistory');
   if(d&&d.history&&d.history.length>0){
-    swapHistory=d.history;applySwaps();renderM();
+    swapHistory=d.history;buildCalData();if(document.getElementById('cw').style.display!=='none')renderCal();
   }
 }
-function applySwaps(){
+// カレンダー用データ（交換適用済み）
+var calByT={},calByC={};
+var swappedSlots=new Set(); // 交換されたスロットを記録（蛍光色表示用）
+
+function buildCalData(){
+  // レギュラーデータをディープコピー
+  calByT={};calByC={};swappedSlots=new Set();
+  Object.keys(byT).forEach(function(tn){
+    calByT[tn]={};
+    Object.keys(byT[tn]).forEach(function(k){calByT[tn][k]=byT[tn][k];});
+  });
+  Object.keys(byC).forEach(function(cn){
+    calByC[cn]={};
+    Object.keys(byC[cn]).forEach(function(k){calByC[cn][k]=byC[cn][k];});
+  });
+  // 交換履歴を適用
   var dnr={'月':1,'火':2,'水':3,'木':4,'金':5,'土':6};
   swapHistory.forEach(function(sw){
     var sA={day:dnr[sw.slotA.charAt(0)],period:parseInt(sw.slotA.substring(1))};
     var sB={day:dnr[sw.slotB.charAt(0)],period:parseInt(sw.slotB.substring(1))};
     if(!sA.day||!sB.day)return;
     var kA=sA.day+'-'+sA.period,kB=sB.day+'-'+sB.period;
-    var schA=byT[sw.teacherA],schB=byT[sw.teacherB];
+    var schA=calByT[sw.teacherA],schB=calByT[sw.teacherB];
     if(!schA||!schB)return;
     var eA=schA[kA],eB=schB[kB];
     if(!eA||!eB)return;
@@ -417,7 +429,10 @@ function applySwaps(){
     var nA=Object.assign({},eA,{day:sB.day,period:sB.period});
     var nB=Object.assign({},eB,{day:sA.day,period:sA.period});
     schA[kB]=nA;schB[kA]=nB;
-    if(byC[sw.class_name]){byC[sw.class_name][kA]=nB;byC[sw.class_name][kB]=nA;}
+    if(calByC[sw.class_name]){calByC[sw.class_name][kA]=nB;calByC[sw.class_name][kB]=nA;}
+    // 交換されたスロットを記録
+    swappedSlots.add(sw.teacherA+'_'+kB);
+    swappedSlots.add(sw.teacherB+'_'+kA);
   });
 }
 
@@ -461,7 +476,7 @@ var NATIONAL_HOLIDAYS=new Set(['2026-01-01','2026-01-12','2026-02-11','2026-02-2
 
 function switchView(mode){
   if(mode==='table'){document.getElementById('mw').style.display='';document.getElementById('cw').style.display='none';document.getElementById('btn-table').style.cssText='padding:4px 10px;border:1px solid var(--accent);border-radius:5px;font-size:10px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600;';document.getElementById('btn-cal').style.cssText='padding:4px 10px;border:1px solid var(--border);border-radius:5px;font-size:10px;cursor:pointer;background:#fff;';}
-  else{document.getElementById('mw').style.display='none';document.getElementById('cw').style.display='';document.getElementById('btn-cal').style.cssText='padding:4px 10px;border:1px solid var(--accent);border-radius:5px;font-size:10px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600;';document.getElementById('btn-table').style.cssText='padding:4px 10px;border:1px solid var(--border);border-radius:5px;font-size:10px;cursor:pointer;background:#fff;';renderCal();}
+  else{document.getElementById('mw').style.display='none';document.getElementById('cw').style.display='';document.getElementById('btn-cal').style.cssText='padding:4px 10px;border:1px solid var(--accent);border-radius:5px;font-size:10px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600;';document.getElementById('btn-table').style.cssText='padding:4px 10px;border:1px solid var(--border);border-radius:5px;font-size:10px;cursor:pointer;background:#fff;';buildCalData();loadEvents().then(function(){renderCal();});renderCal();}
 }
 function pad2(n){return n<10?'0'+n:''+n;}
 function dateStr(dt){return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());}
@@ -495,7 +510,7 @@ function renderCal(){
     var tn=v.name,subj=v.subject;
     if(pinnedTeacher===tn)return;
     if(subj!==lastSubj){var bg=SUBJ_BG[subj]||'#334155';var tc=dates.reduce(function(s2,dt){return s2+(dt.getDay()===6?3:8);},0);h+='<tr><td class="subj-label" colspan="'+(tc+1)+'" style="background:'+bg+';color:#fff;height:4px;padding:2px 6px!important;font-size:10px;font-weight:700;border:none;">▸ '+subj+'</td></tr>';lastSubj=subj;}
-    var sc=byT[tn]||{},off=new Set((offD[tn]||[]).map(Number));
+    var sc=calByT[tn]||byT[tn]||{},off=new Set((offD[tn]||[]).map(Number));
     h+='<tr><td class="rn">'+tn+'</td>';
     dates.forEach(function(dt){
       var ds=dateStr(dt),isH=NATIONAL_HOLIDAYS.has(ds),dow=dt.getDay(),sDay={1:1,2:2,3:3,4:4,5:5,6:6}[dow],periods=dow===6?[1,2,3]:[1,2,3,4,5,6,7,8];
@@ -504,7 +519,7 @@ function renderCal(){
         else if(off.has(sDay)){h+='<td class="off" style="color:#bbb;font-size:13px;">✖</td>';}
         else{
           var k=sDay+'-'+p,e=sc[k];
-          if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+'" title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span></td>';}
+          if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var isSwapped=swappedSlots.has(tn+'_'+k);h+='<td class="'+(isSwapped?'swapped':'')+'" style="'+(isSwapped?'':'background:'+bg2+';')+(mid?'font-weight:700;':'')+'" title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(isSwapped?'&#10;【交換済】':'')+'">'+(isSwapped?'⚡':'')+'<span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span></td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
           else{h+='<td class="e"></td>';}
         }
