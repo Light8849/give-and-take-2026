@@ -118,12 +118,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v3.7 2026-04-04<br>
-- Print: fixed column width, aligned layout<br>
-- Print: requester name handwrite field<br>
-- Calendar: larger date &amp; event text<br>
-- Calendar cells clickable for swap search<br>
-- Swap date: dropdown picker (next 8 weeks)
+v3.8 2026-04-04<br>
+- Confirm button: "確定（教務）" label<br>
+- Confirm alert: wait 1-2 min message<br>
+- Calendar: deploy lessons faded (opacity)<br>
+- Print: fixed columns + requester field<br>
+- Calendar cells clickable for swap search
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -338,7 +338,7 @@ function selCand(i){
   pv+='<div class="pc rv"><div class="bg">🟢 '+DN[c.d]+c.p+'限</div>'+c.t+'「'+c.l+'」</div>';
   pv+='<div style="font-size:11px;color:#64748b;padding:0 8px;">対象: '+s.mc+'</div>';
   pv+='<button onclick="printSwap()" style="padding:6px 16px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 4px;">🖨 印刷（交換依頼書）</button>';
-  pv+='<button onclick="showDatePicker('+i+')" style="padding:6px 16px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 4px;">✅ この交換を確定</button>';
+  pv+='<button onclick="showDatePicker('+i+')" style="padding:6px 16px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin:0 4px;">✅ 交換を確定（教務）</button>';
   pv+='</div>';
   document.getElementById('sp-pv').innerHTML=pv;
   highlights={};
@@ -430,7 +430,7 @@ function showDatePicker(idx){
   mh+='</div>';
   mh+='<div style="display:flex;gap:10px;justify-content:center;">';
   mh+='<button onclick="closeDateModal()" style="padding:8px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">キャンセル</button>';
-  mh+='<button onclick="submitSwap('+idx+')" style="padding:8px 20px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">✅ 確定</button>';
+  mh+='<button onclick="submitSwap('+idx+')" style="padding:8px 20px;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">✅ 確定（教務）</button>';
   mh+='</div></div></div>';
   document.body.insertAdjacentHTML('beforeend',mh);
 }
@@ -454,7 +454,7 @@ async function submitSwap(idx){
     buildCalData();
     var WDAY2=['日','月','火','水','木','金','土'];
     var dA=new Date(dateA),dB=new Date(dateB);
-    alert('✅ 交換を確定しました！\n'+(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+') '+slotA+' '+s.mt+'「'+s.me.lesson+'」\n⇄\n'+(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+slotB+' '+c.t+'「'+c.l+'」');
+    alert('✅ 交換が確定しました！\n1〜2分ほどお待ちください。\n'+(dA.getMonth()+1)+'/'+dA.getDate()+'('+WDAY2[dA.getDay()]+') '+slotA+' '+s.mt+'「'+s.me.lesson+'」\n⇄\n'+(dB.getMonth()+1)+'/'+dB.getDate()+'('+WDAY2[dB.getDay()]+') '+slotB+' '+c.t+'「'+c.l+'」');
     closeSwap();
   }else{alert('エラー: '+(result?JSON.stringify(result):'通信失敗'));}
 }
@@ -638,7 +638,7 @@ function renderCal(){
             h+='<td class="swapped" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済】"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
           }else if(swInfo&&swInfo.type==='removed'){
             h+='<td style="background:#fff3cd;color:#856404;font-size:8px;" title="'+swInfo.info+'">→移動</td>';
-          }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'')+'" '+(canClick?'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" ':'')+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
+          }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'opacity:.45;')+'" '+(canClick?'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" ':'')+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開・交換不可]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
           else{h+='<td class="e"></td>';}
         }
