@@ -86,6 +86,10 @@ table.cal td.holiday-col{background:#fef2f2;}
 #pw-screen input{padding:12px 20px;border:2px solid #475569;border-radius:8px;background:#334155;color:#fff;font-size:16px;width:240px;text-align:center;outline:none;}
 #pw-screen button{margin-top:12px;padding:10px 32px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:14px;cursor:pointer;}
 #pw-err{color:#ef4444;font-size:12px;margin-top:10px;display:none;}
+.move-source{background:#fbbf24!important;outline:3px solid #d97706!important;cursor:pointer!important;}
+.move-placed{background:#fef3c7!important;color:#92400e;font-weight:700;cursor:pointer;}
+.move-out{background:#f3f4f6!important;color:#9ca3af;font-size:8px;cursor:pointer;}
+#move-bar{display:none;background:#fffbeb;border-bottom:2px solid #d97706;padding:6px 16px;font-size:12px;color:#92400e;font-weight:600;}
 @media print{
   #pw-screen,.topbar,.filter-bar,.sp,#app>.main-wrap,#app>.cal-wrap{display:none!important;}
   #print-area{display:block!important;padding:8mm;}
@@ -118,12 +122,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v5.1 2026-04-04<br>
-- Fix: calendar updates after swap confirm<br>
-- Fix: calendar redraws after panel close<br>
-- Clean: removed debug logs, unused functions<br>
-- Data: holidays 2026-04 to 2027-03<br>
-- Confirm message simplified
+v5.2 2026-04-04<br>
+- New: Force-move mode (教務 only, pw:take)<br>
+- Fix: block swap if different class occupies<br>
+- Fix: GAS deleteSwap period type matching<br>
+- Force-move: click source → click dest → done<br>
+- 📌 placed cells shown in yellow
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -135,9 +139,13 @@ v5.1 2026-04-04<br>
   <label>教科:</label><select id="f-subj" onchange="applyFilter()"><option value="">すべて</option></select>
   <div class="sep"></div>
   <label>検索:</label><input type="text" id="f-name" placeholder="教員名..." oninput="applyFilter()" style="width:120px;">
+  <div class="sep">
   <div class="sep"></div>
+  <button id="btn-move" onclick="toggleMoveMode()" style="padding:4px 10px;border:1px solid #d97706;border-radius:5px;font-size:10px;cursor:pointer;background:#fff;color:#d97706;font-weight:600;">🔧 移動（教務）</button>
+</div>
   <div class="pinned-info" id="pin-info">📌 <span id="pin-name"></span><button onclick="unpin()">✕</button></div>
 </div>
+<div id="move-bar">📌 移動モード：移動したいコマをクリックしてください <button onclick="exitMoveMode()" style="margin-left:12px;padding:2px 8px;border:1px solid #d97706;border-radius:4px;background:#fff;font-size:10px;cursor:pointer;">✕ 終了</button></div>
 <div class="main-wrap" id="mw" style="display:none;"></div>
 <div class="cal-wrap" id="cw"><div class="cal-header"><button onclick="calPrev()">◀ 前の2週</button><span class="cal-range" id="cal-range"></span><button onclick="calNext()">次の2週 ▶</button></div><div id="cal-table"></div></div>
 <div id="print-area"></div>
@@ -575,7 +583,7 @@ function getSwapForCell(dateStr,teacherName,period){
   var result=null;
   for(var i=0;i<swaps.length;i++){
     if(swaps[i].teacher===teacherName && swaps[i].period===period){
-      if(swaps[i].type==='moved_in')return swaps[i];
+      if(swaps[i].type==='moved_in'||swaps[i].type==='placed')return swaps[i];
       result=swaps[i];
     }
   }
@@ -594,10 +602,17 @@ function buildCalData(){
     var dnr2={'月':1,'火':2,'水':3,'木':4,'金':5,'土':6};
     var slotAday=dnr2[sw.slotA.charAt(0)]||0;
     var slotBday=dnr2[sw.slotB.charAt(0)]||0;
-    addToSwapMap(sw.dateA,{teacher:sw.teacherA,period:pA,type:'removed',info:sw.lessonA+' → '+DN[slotBday]+pB+'限へ'});
-    addToSwapMap(sw.dateA,{teacher:sw.teacherB,period:pA,type:'moved_in',lesson:sw.lessonB,from:sw.dateB,class_name:sw.class_name});
-    addToSwapMap(sw.dateB,{teacher:sw.teacherB,period:pB,type:'removed',info:sw.lessonB+' → '+DN[slotAday]+pA+'限へ'});
-    addToSwapMap(sw.dateB,{teacher:sw.teacherA,period:pB,type:'moved_in',lesson:sw.lessonA,from:sw.dateA,class_name:sw.class_name});
+    if(sw.type==='move'){
+      // 手差し移動: 移動元からremoved、移動先にplaced
+      addToSwapMap(sw.dateA,{teacher:sw.teacherA,period:pA,type:'removed',info:sw.lessonA+' → '+sw.teacherB+' '+DN[slotBday]+pB+'限へ(手差し)'});
+      addToSwapMap(sw.dateB,{teacher:sw.teacherB,period:pB,type:'placed',lesson:sw.lessonA,from:sw.dateA,class_name:sw.class_name,origTeacher:sw.teacherA});
+    }else{
+      // 通常交換
+      addToSwapMap(sw.dateA,{teacher:sw.teacherA,period:pA,type:'removed',info:sw.lessonA+' → '+DN[slotBday]+pB+'限へ'});
+      addToSwapMap(sw.dateA,{teacher:sw.teacherB,period:pA,type:'moved_in',lesson:sw.lessonB,from:sw.dateB,class_name:sw.class_name});
+      addToSwapMap(sw.dateB,{teacher:sw.teacherB,period:pB,type:'removed',info:sw.lessonB+' → '+DN[slotAday]+pA+'限へ'});
+      addToSwapMap(sw.dateB,{teacher:sw.teacherA,period:pB,type:'moved_in',lesson:sw.lessonA,from:sw.dateA,class_name:sw.class_name});
+    }
   });
 }
 
@@ -760,15 +775,17 @@ function renderCal(){
           var k=sDay+'-'+p,e=sc[k];
           var swInfo=getSwapForCell(ds,tn,p);
           // バツ印でも交換が入っていれば蛍光色で表示
-          if(!swInfo&&off.has(sDay)){h+='<td class="off" style="color:#bbb;font-size:13px;">✖</td>';}
+          if(!swInfo&&off.has(sDay)){h+='<td class="off" style="color:#bbb;font-size:13px;" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-ds="'+ds+'">✖</td>';}
           else{
-          if(swInfo&&swInfo.type==='moved_in'){
+          if(swInfo&&swInfo.type==='placed'){
+            h+='<td class="move-placed" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-ds="'+ds+'" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'" style="cursor:pointer;" title="'+swInfo.lesson+'&#10;('+swInfo.origTeacher+'から手差し移動)&#10;クリックで取り下げ"><span style="font-size:7px;">📌</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+(swInfo.class_name||'').substring(0,6)+'</span></td>';
+          }else if(swInfo&&swInfo.type==='moved_in'){
             h+='<td class="swapped" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-ds="'+ds+'" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'" style="cursor:pointer;" title="'+swInfo.lesson+'&#10;('+swInfo.from+'から移動)&#10;【交換済】&#10;クリックで取り下げ"><span style="font-size:7px;">⚡</span><span class="n">'+swInfo.lesson.substring(0,5)+'</span><span class="s">'+swInfo.class_name.substring(0,6)+'</span></td>';
           }else if(swInfo&&swInfo.type==='removed'){
             h+='<td style="background:#fff3cd;color:#856404;font-size:8px;cursor:pointer;" title="'+swInfo.info+'&#10;クリックで取り下げ" data-undo="'+ds+'" data-undo-t="'+tn+'" data-undo-p="'+p+'">→移動</td>';
-          }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'opacity:.45;')+'" '+(canClick?'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-ds="'+ds+'" ':'')+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開・交換不可]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
+          }else if(e){var bg2=SC[e.subject]||'#fff';var mid=e.all_classes.some(function(c){return c.startsWith('中');});var canClick=!e.is_deploy&&e.teachers.length===1&&e.all_classes.length===1;h+='<td style="background:'+bg2+';'+(mid?'font-weight:700;':'')+(canClick?'cursor:pointer;':'opacity:.45;')+'" '+'data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-ds="'+ds+'" '+' title="'+e.lesson+'&#10;'+e.all_classes.join(',').replace(/中学/g,'中')+(canClick?'':'&#10;[展開・交換不可]')+'"><span class="n">'+e.lesson.substring(0,5)+'</span><span class="s">'+e.all_classes.join(',').replace(/中学/g,'中').substring(0,6)+'</span>'+(e.is_deploy?'<span class="d">展</span>':'')+'</td>';}
           else if(meetingNamed[tn]&&meetingNamed[tn][sDay+'-'+p]){var mn2=meetingNamed[tn][sDay+'-'+p];h+='<td style="background:#e8daef;color:#7030A0;font-size:9px;font-weight:600;" title="'+mn2+'">'+mn2.substring(0,4)+'</td>';}
-          else{h+='<td class="e"></td>';}
+          else{h+='<td class="e" data-t="'+tn+'" data-d="'+sDay+'" data-p="'+p+'" data-ds="'+ds+'"></td>';}
         }}
       });
     });
@@ -809,6 +826,17 @@ async function undoSwap(dateStr,teacher,period){
 }
 // カレンダーのクリック
 document.getElementById('cal-table').addEventListener('click',function(ev){
+  // 移動モード時は専用ハンドラ
+  if(moveMode){
+    var td=ev.target.closest('td[data-ds]');
+    if(td&&td.dataset.t){
+      handleMoveClick(td.dataset.t,+td.dataset.d,+td.dataset.p,td.dataset.ds);
+      return;
+    }
+    // data-dsがないセル（空セル等）もクリック可能にする
+    // → 空セルにもdata属性を付ける必要がある（renderCalで対応）
+    return;
+  }
   var undoTd=ev.target.closest('td[data-undo]');
   if(undoTd&&!undoTd.dataset.t){
     undoSwap(undoTd.dataset.undo,undoTd.dataset.undoT,+undoTd.dataset.undoP);
@@ -817,6 +845,128 @@ document.getElementById('cal-table').addEventListener('click',function(ev){
   var td=ev.target.closest('td[data-t]');
   if(td){clickCell(td.dataset.t,+td.dataset.d,+td.dataset.p,td.dataset.ds||'');}
 });
+
+
+// =============================================
+// 手差し移動モード（教務専用）
+// =============================================
+var moveMode=false;
+var moveSource=null; // {teacher, day, period, dateStr, lesson, class_name}
+
+function toggleMoveMode(){
+  if(moveMode){exitMoveMode();return;}
+  var pw=prompt('教務パスワードを入力してください:');
+  if(pw!=='take'){if(pw!==null)alert('パスワードが違います');return;}
+  moveMode=true;
+  moveSource=null;
+  document.getElementById('move-bar').style.display='block';
+  document.getElementById('btn-move').style.background='#d97706';
+  document.getElementById('btn-move').style.color='#fff';
+  renderCal();
+}
+
+function exitMoveMode(){
+  moveMode=false;
+  moveSource=null;
+  document.getElementById('move-bar').style.display='none';
+  document.getElementById('btn-move').style.background='#fff';
+  document.getElementById('btn-move').style.color='#d97706';
+  renderCal();
+}
+
+function handleMoveClick(tn,sDay,p,ds){
+  if(!moveSource){
+    // 移動元を選択
+    var e=(byT[tn]||{})[sDay+'-'+p];
+    // swapMapからmoved_inを探す
+    var swInfo=getSwapForCell(ds,tn,p);
+    if(swInfo&&swInfo.type==='moved_in'){
+      e={lesson:swInfo.lesson,class_name:swInfo.class_name};
+    }
+    if(!e){alert('このセルには授業がありません');return;}
+    moveSource={teacher:tn,day:sDay,period:p,dateStr:ds,lesson:e.lesson,class_name:e.class_name||''};
+    document.getElementById('move-bar').innerHTML='📌 移動モード：<b>'+tn+' '+DN[sDay]+p+'限「'+e.lesson+'」</b>の移動先をクリック <button onclick="cancelMoveSource()" style="margin-left:8px;padding:2px 8px;border:1px solid #d97706;border-radius:4px;background:#fff;font-size:10px;cursor:pointer;">取消</button> <button onclick="exitMoveMode()" style="margin-left:4px;padding:2px 8px;border:1px solid #d97706;border-radius:4px;background:#fff;font-size:10px;cursor:pointer;">✕ 終了</button>';
+    renderCal();
+  }else{
+    // 移動先を選択
+    if(tn===moveSource.teacher&&sDay===moveSource.day&&p===moveSource.period&&ds===moveSource.dateStr){
+      cancelMoveSource();return;
+    }
+    showMoveDatePicker(tn,sDay,p,ds);
+  }
+}
+
+function cancelMoveSource(){
+  moveSource=null;
+  document.getElementById('move-bar').innerHTML='📌 移動モード：移動したいコマをクリックしてください <button onclick="exitMoveMode()" style="margin-left:12px;padding:2px 8px;border:1px solid #d97706;border-radius:4px;background:#fff;font-size:10px;cursor:pointer;">✕ 終了</button>';
+  renderCal();
+}
+
+function showMoveDatePicker(destTeacher,destDay,destPeriod,destDateStr){
+  var src=moveSource;
+  var srcDates=getNextDates(src.day,8);
+  var destDates=getNextDates(destDay,8);
+  var WDAY2=['日','月','火','水','木','金','土'];
+  var optsS='',optsD='';
+  srcDates.forEach(function(dt){
+    var ds2=dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+    optsS+='<option value="'+ds2+'"'+(ds2===src.dateStr?' selected':'')+'>'+( dt.getMonth()+1)+'/'+dt.getDate()+'('+WDAY2[dt.getDay()]+')</option>';
+  });
+  destDates.forEach(function(dt){
+    var ds2=dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+    optsD+='<option value="'+ds2+'"'+(ds2===destDateStr?' selected':'')+'>'+( dt.getMonth()+1)+'/'+dt.getDate()+'('+WDAY2[dt.getDay()]+')</option>';
+  });
+  var mh='<div id="move-date-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;">';
+  mh+='<div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.3);">';
+  mh+='<h3 style="margin:0 0 16px;font-size:16px;text-align:center;">🔧 手差し移動</h3>';
+  mh+='<div style="margin-bottom:12px;padding:10px;background:#fffbeb;border-radius:8px;border:1px solid #fbbf24;">';
+  mh+='<div style="font-size:11px;color:#92400e;font-weight:700;">📌 移動元: '+src.teacher+'「'+src.lesson+'」('+DN[src.day]+src.period+'限)</div>';
+  mh+='<select id="move-dateS" style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;">'+optsS+'</select>';
+  mh+='</div>';
+  mh+='<div style="margin-bottom:16px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;">';
+  mh+='<div style="font-size:11px;color:#16a34a;font-weight:700;">📍 移動先: '+destTeacher+' '+DN[destDay]+destPeriod+'限</div>';
+  mh+='<select id="move-dateD" style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;">'+optsD+'</select>';
+  mh+='</div>';
+  mh+='<div style="display:flex;gap:10px;justify-content:center;">';
+  mh+='<button onclick="closeMoveModal()" style="padding:8px 20px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">キャンセル</button>';
+  mh+='<button onclick="confirmMove(\''+destTeacher+'\','+destDay+','+destPeriod+')" style="padding:8px 20px;border:none;border-radius:6px;background:#d97706;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">🔧 移動確定</button>';
+  mh+='</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',mh);
+}
+
+function closeMoveModal(){var m=document.getElementById('move-date-modal');if(m)m.remove();}
+
+async function confirmMove(destTeacher,destDay,destPeriod){
+  var dateSrc=document.getElementById('move-dateS').value;
+  var dateDst=document.getElementById('move-dateD').value;
+  closeMoveModal();
+  var src=moveSource;
+  var slotSrc=DN[src.day]+src.period;
+  var slotDst=DN[destDay]+destPeriod;
+  var result=await gasGet('addSwap',{
+    class_name:src.class_name,
+    teacherA:src.teacher,lessonA:src.lesson,slotA:slotSrc,
+    dateA:dateSrc,periodA:src.period,
+    teacherB:destTeacher,lessonB:'(手差し)',slotB:slotDst,
+    dateB:dateDst,periodB:destPeriod,
+    type:'move'
+  });
+  if(result&&result.success){
+    swapHistory.push({
+      teacherA:src.teacher,lessonA:src.lesson,slotA:slotSrc,
+      dateA:dateSrc,periodA:src.period,
+      teacherB:destTeacher,lessonB:'(手差し)',slotB:slotDst,
+      dateB:dateDst,periodB:destPeriod,
+      class_name:src.class_name,type:'move'
+    });
+    buildCalData();
+    renderCal();
+    alert('✅ 移動完了！\n'+src.teacher+'「'+src.lesson+'」\n→ '+destTeacher+' '+DN[destDay]+destPeriod+'限');
+    cancelMoveSource();
+  }else{
+    alert('エラー: '+(result?JSON.stringify(result):'通信失敗'));
+  }
+}
 
 // 初期化
 renderM();
