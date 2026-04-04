@@ -118,12 +118,12 @@ table.cal td.holiday-col{background:#fef2f2;}
 <br><br>
 <div style="text-align:left;max-width:360px;margin:0 auto;">
 <p style="color:#00ff88;font-size:10px;font-weight:700;line-height:1.7;font-family:monospace;text-shadow:0 0 4px rgba(0,255,136,.3);">
-v3.8 2026-04-04<br>
-- Confirm button: "確定（教務）" label<br>
-- Confirm alert: wait 1-2 min message<br>
+v3.9 2026-04-04<br>
+- Swap history persists across reloads<br>
+- Weekly swaps (no date) shown every week<br>
+- Date-based swaps shown on specific day<br>
 - Calendar: deploy lessons faded (opacity)<br>
-- Print: fixed columns + requester field<br>
-- Calendar cells clickable for swap search
+- Confirm button: "確定（教務）" + wait msg
 </p>
 </div></div></div>
 <div id="app" style="display:none;">
@@ -488,36 +488,67 @@ async function loadSwapHistory(){
 // 日付ベースの交換マップ
 // swapMap[dateStr] = [{teacherA,periodA,teacherB,periodB,lessonA,lessonB,class_name}, ...]
 var swapMap={};
+var swapWeekly=[];
 
 
 
 function getSwapForCell(dateStr,teacherName,period){
+  // 1. 日付ベースの交換を優先チェック
   var swaps=swapMap[dateStr];
-  if(!swaps)return null;
-  var result=null;
-  for(var i=0;i<swaps.length;i++){
-    if(swaps[i].teacher===teacherName && swaps[i].period===period){
-      if(swaps[i].type==='moved_in')return swaps[i]; // 移動先を優先
-      result=swaps[i];
+  if(swaps){
+    var result=null;
+    for(var i=0;i<swaps.length;i++){
+      if(swaps[i].teacher===teacherName && swaps[i].period===period){
+        if(swaps[i].type==='moved_in')return swaps[i];
+        result=swaps[i];
+      }
+    }
+    if(result)return result;
+  }
+  // 2. 毎週交換をチェック（曜日ベース）
+  var dt=new Date(dateStr);
+  var dow={0:0,1:1,2:2,3:3,4:4,5:5,6:6}[dt.getDay()];
+  for(var j=0;j<swapWeekly.length;j++){
+    var w=swapWeekly[j];
+    // teacherAのdayA/periodAが消えて、dayB/periodBに移動
+    if(w.teacherA===teacherName && w.dayA===dow && w.periodA===period){
+      return {type:'removed',info:w.lessonA+' → '+DN[w.dayB]+w.periodB+'限へ'};
+    }
+    if(w.teacherA===teacherName && w.dayB===dow && w.periodB===period){
+      return {type:'moved_in',lesson:w.lessonA,from:DN[w.dayA]+w.periodA+'限',class_name:w.class_name};
+    }
+    // teacherBのdayB/periodBが消えて、dayA/periodAに移動
+    if(w.teacherB===teacherName && w.dayB===dow && w.periodB===period){
+      return {type:'removed',info:w.lessonB+' → '+DN[w.dayA]+w.periodA+'限へ'};
+    }
+    if(w.teacherB===teacherName && w.dayA===dow && w.periodA===period){
+      return {type:'moved_in',lesson:w.lessonB,from:DN[w.dayB]+w.periodB+'限',class_name:w.class_name};
     }
   }
-  return result;
+  return null;
 }
 function buildCalData(){
   swapMap={};
+  swapWeekly=[];
+  var dnr2={'月':1,'火':2,'水':3,'木':4,'金':5,'土':6};
   swapHistory.forEach(function(sw){
-    if(!sw.dateA||!sw.dateB)return;
-    var pA=+sw.periodA,pB=+sw.periodB;
-    // dateA: teacherAのperiodAから授業を消す
-    if(!swapMap[sw.dateA])swapMap[sw.dateA]=[];
-    swapMap[sw.dateA].push({teacher:sw.teacherA,period:pA,type:'removed',info:sw.lessonA+' → '+sw.dateB+DN[new Date(sw.dateB).getDay()===0?7:new Date(sw.dateB).getDay()]+pB+'限へ'});
-    // dateA: teacherBのperiodAにlessonBを移動（元はdateB/periodBにあった）
-    swapMap[sw.dateA].push({teacher:sw.teacherB,period:pA,type:'moved_in',lesson:sw.lessonB,from:sw.dateB,class_name:sw.class_name});
-    // dateB: teacherBのperiodBから授業を消す
-    if(!swapMap[sw.dateB])swapMap[sw.dateB]=[];
-    swapMap[sw.dateB].push({teacher:sw.teacherB,period:pB,type:'removed',info:sw.lessonB+' → '+sw.dateA+DN[new Date(sw.dateA).getDay()===0?7:new Date(sw.dateA).getDay()]+pA+'限へ'});
-    // dateB: teacherAのperiodBにlessonAを移動（元はdateA/periodAにあった）
-    swapMap[sw.dateB].push({teacher:sw.teacherA,period:pB,type:'moved_in',lesson:sw.lessonA,from:sw.dateA,class_name:sw.class_name});
+    if(sw.dateA&&sw.dateB){
+      // 日付ベースの交換
+      var pA=+sw.periodA,pB=+sw.periodB;
+      if(!swapMap[sw.dateA])swapMap[sw.dateA]=[];
+      swapMap[sw.dateA].push({teacher:sw.teacherA,period:pA,type:'removed',info:sw.lessonA+' → '+DN[pB?dnr2[DN[new Date(sw.dateB).getDay()]]:0]+pB+'限へ'});
+      swapMap[sw.dateA].push({teacher:sw.teacherB,period:pA,type:'moved_in',lesson:sw.lessonB,from:sw.dateB,class_name:sw.class_name});
+      if(!swapMap[sw.dateB])swapMap[sw.dateB]=[];
+      swapMap[sw.dateB].push({teacher:sw.teacherB,period:pB,type:'removed',info:sw.lessonB+' → '+DN[dnr2[sw.slotA.charAt(0)]]+pA+'限へ'});
+      swapMap[sw.dateB].push({teacher:sw.teacherA,period:pB,type:'moved_in',lesson:sw.lessonA,from:sw.dateA,class_name:sw.class_name});
+    }else{
+      // 毎週適用の交換（dateA/dateBなし）
+      var dayA=dnr2[sw.slotA.charAt(0)],perA=parseInt(sw.slotA.substring(1));
+      var dayB=dnr2[sw.slotB.charAt(0)],perB=parseInt(sw.slotB.substring(1));
+      if(dayA&&dayB){
+        swapWeekly.push({teacherA:sw.teacherA,lessonA:sw.lessonA,dayA:dayA,periodA:perA,teacherB:sw.teacherB,lessonB:sw.lessonB,dayB:dayB,periodB:perB,class_name:sw.class_name});
+      }
+    }
   });
 }
 
