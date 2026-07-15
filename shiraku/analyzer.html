@@ -66,7 +66,7 @@ summary{cursor:pointer;font-size:12px;color:#2563eb}
     <label class="opt"><input type="checkbox" id="opt-lunch" checked> 昼休み消失チェック（中学=4限・高校=5限の時差構造）</label>
     <label class="opt">連続コマ警告 <input type="number" id="opt-consec" value="5" min="2" max="9"> 以上</label>
     <label class="opt">1日コマ数警告 <input type="number" id="opt-daily" value="7" min="4" max="10"> 以上</label>
-    <label class="opt"><input type="checkbox" id="opt-samesubj"> 同一クラス・同日に同じ科目が2回以上入るのを表示（本校は多数許容されているためデフォルトOFF）</label>
+    <label class="opt"><input type="checkbox" id="opt-samesubj" checked> 2単位科目の同日・非連続配置を警告（家庭科等の連続2時間設計は除外）</label>
   </div>
   <div class="row">
     <button class="primary" id="run">検証実行</button>
@@ -271,19 +271,23 @@ function runChecks(){
     }
   });
 
-  // 9) 同一クラス・同日に同じ科目（授業名単位）
+  // 9) 2単位科目（週2コマ）が同じ日に非連続で2回入っているケース
+  //    連続2時間の設計（家庭科調理・技術家庭など）は正常なので除外する
   if (optSameSubj){
     var cd = {};
     d.entries.forEach(function(e){
       if (!e.lesson) return;
-      var k = e.class_name + "|" + e.day + "|" + e.lesson;
-      (cd[k] = cd[k] || new Set()).add(e.period);
+      var k = e.class_name + "|" + e.lesson;
+      (cd[k] = cd[k] || new Set()).add(e.day + "|" + e.period);
     });
     Object.keys(cd).forEach(function(k){
-      if (cd[k].size > 1){
+      if (cd[k].size !== 2) return;
+      var s = Array.from(cd[k]).map(function(x){var a = x.split("|"); return [+a[0], +a[1]];});
+      if (s[0][0] === s[1][0] && Math.abs(s[0][1] - s[1][1]) > 1){
         var p = k.split("|");
-        add("info","同日に同一科目が複数回", p[0]+"（"+p[2]+"）", +p[1], Math.min.apply(null,Array.from(cd[k])),
-          Array.from(cd[k]).sort(function(a,b){return a-b;}).join(",")+"限");
+        var ps = [s[0][1], s[1][1]].sort(function(a,b){return a-b;});
+        add("warn","2単位が同日・非連続で2回", p[0]+"（"+p[1]+"）", s[0][0], ps[0],
+          ps[0]+"限と"+ps[1]+"限（別の日に分けるのが理想）");
       }
     });
   }
