@@ -33,12 +33,14 @@ blocked = {t: set(tuple(map(int, x.split('-'))) for x in v) for t, v in conv['te
 meetings = {t: set(tuple(map(int, x.split('-'))) for x in v) for t, v in conv['teacher_meetings'].items()}
 
 conv_idx = {(e['class_name'], e['day'], e['period']): e['room'] for e in conv['entries'] if e['room']}
-room_of = {}
+COMPOSITE = {'高/高/高': ['高校音楽', '高校書道', '高校美術'], '中/中': ['中学音楽', '中学美術']}
+rooms_of = {}
 for pc, g in G.items():
     rooms = {conv_idx.get((c, d, p)) for c in g['classes'] for (d, p) in g['slots']}
     rooms.discard(None)
     if len(rooms) == 1:
-        room_of[pc] = rooms.pop()
+        r = rooms.pop()
+        rooms_of[pc] = COMPOSITE.get(r, [r])   # 複合教室は構成室に分解
 ROOM_CAP = collections.defaultdict(lambda: 1)
 ROOM_CAP['外／中'] = 4
 
@@ -179,8 +181,8 @@ for s in slots_all:
     rains = []
     for pc, g in G.items():
         if s in cand_of[pc]:
-            r = room_of.get(pc)
-            if r: byroom[r].append(X[(pc, s)])
+            for r in rooms_of.get(pc, []):
+                byroom[r].append(X[(pc, s)])
             if is_rain(g): rains.append(X[(pc, s)])
     for r, xs in byroom.items():
         model.Add(sum(xs) <= ROOM_CAP[r])
