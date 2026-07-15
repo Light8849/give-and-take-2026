@@ -292,6 +292,28 @@ function runChecks(){
     });
   }
 
+  // 10) 雨天ルール: 屋内退避が必要な体育（教室実施・柔道/弓道を除く）は
+  //     同時2授業まで。妥協で3授業の場合も教員計7名まで（2026-07 担当者確認の学校ルール）
+  var rain = {};
+  slots.forEach(function(e){
+    if (e.subject === "保健体育" && e.lesson && e.lesson.indexOf("保健") !== 0 &&
+        e.lesson.indexOf("教室") < 0 && e.lesson.indexOf("柔道") < 0 && e.lesson.indexOf("弓道") < 0){
+      var k = e.day + "|" + e.period;
+      var r = rain[k] = rain[k] || {n: 0, t: new Set()};
+      r.n++;
+      e.teachers.forEach(function(x){ r.t.add(x); });
+    }
+  });
+  Object.keys(rain).forEach(function(k){
+    var r = rain[k], p = k.split("|");
+    if (r.n > 3 || (r.n >= 3 && r.t.size > 7))
+      add("err", "雨天ルール超過（体育" + r.n + "授業同時・教員" + r.t.size + "名）", "体育（雨天対象）", +p[0], +p[1],
+        "上限: 2授業まで（妥協3授業でも教員計7名まで）");
+    else if (r.n === 3)
+      add("warn", "雨天の妥協枠を使用（体育3授業同時）", "体育（雨天対象）", +p[0], +p[1],
+        "教員計" + r.t.size + "名（7名以内・許容だが理想は2授業）");
+  });
+
   render(d, slots, V, tstat, offD);
 }
 
