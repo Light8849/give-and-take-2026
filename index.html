@@ -25,7 +25,9 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html{-webkit-text-size-adjust:100%;}
-body{font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+body{font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-tap-highlight-color:transparent;}
+button,select,input,td[data-t],.si{touch-action:manipulation;}
+table.m,table.cal,table.st{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 button,input,select{font-family:inherit;}
 ::selection{background:var(--accent-soft);}
 ::-webkit-scrollbar{width:10px;height:10px;}
@@ -69,7 +71,8 @@ button,input,select{font-family:inherit;}
 .mini-btn:hover{background:#fef3c7;}
 
 /* ---- 一覧テーブル ---- */
-.main-wrap{overflow:auto;height:calc(100vh - var(--chrome-h));height:calc(100dvh - var(--chrome-h));}
+.main-wrap{overflow:auto;height:calc(100vh - var(--chrome-h));height:calc(100dvh - var(--chrome-h));overscroll-behavior:contain;}
+body.sp-open .main-wrap,body.sp-open .cal-wrap{height:calc(100vh - var(--chrome-h) - var(--panel-h));height:calc(100dvh - var(--chrome-h) - var(--panel-h));}
 table.m{border-collapse:collapse;font-size:10px;width:max-content;background:var(--surface);}
 table.m thead{position:sticky;top:0;z-index:12;}
 table.m th{background:#f4f6fa;padding:4px 2px;text-align:center;font-weight:600;border:1px solid var(--border);font-size:9px;color:#475569;}
@@ -77,6 +80,7 @@ table.m th.corner{position:sticky;left:0;z-index:30;background:#dde4ee;min-width
 table.m td{padding:1px;text-align:center;border:1px solid var(--border);height:38px;min-width:58px;max-width:68px;overflow:hidden;vertical-align:middle;position:relative;}
 td[data-t]{cursor:pointer;}
 td[data-t]:hover{outline:2px solid var(--accent);outline-offset:-2px;z-index:5;}
+td[data-t]:active{outline:2px solid var(--accent);outline-offset:-2px;z-index:5;}
 td.e{background:#fbfcfe;}
 td.e.day-1{background:#fffef5;}td.e.day-2{background:#fff5f7;}td.e.day-3{background:#f5fff7;}td.e.day-4{background:#f5f8ff;}td.e.day-5{background:#fff8f0;}td.e.day-6{background:#f9f5ff;}
 td.off{background:var(--off);color:#b3bdcc;font-size:13px;}
@@ -97,15 +101,15 @@ tbody.pin-section td{border-bottom:2px solid var(--pin-border);}
 .subj-label{position:sticky;left:0;z-index:5;font-size:11px;font-weight:700;padding:4px 10px!important;border:none!important;text-align:left!important;height:auto!important;letter-spacing:1px;}
 
 /* ---- 交換候補パネル（ボトムシート） ---- */
-.sp{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;box-shadow:var(--shadow-up);z-index:200;max-height:var(--panel-h);overflow-y:auto;display:none;}
+.sp{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;box-shadow:var(--shadow-up);z-index:200;max-height:var(--panel-h);overflow-y:auto;display:none;padding-bottom:env(safe-area-inset-bottom);overscroll-behavior:contain;}
 .sp.open{display:block;}
 .sp-h{display:flex;align-items:center;padding:10px 16px;background:linear-gradient(135deg,var(--ink1),var(--ink2));color:#fff;position:sticky;top:0;z-index:1;border-radius:16px 16px 0 0;}
 .sp-h h3{flex:1;font-size:12px;font-weight:600;}
 .sp-h button{padding:5px 12px;border:1px solid rgba(248,113,113,.45);border-radius:999px;cursor:pointer;font-size:11px;font-weight:600;background:rgba(248,113,113,.10);color:#fca5a5;margin-left:8px;flex:none;}
 .sp-h button:hover{background:rgba(248,113,113,.24);}
 .sp-b{display:flex;}
-.sp-l{width:300px;border-right:1px solid var(--border);overflow-y:auto;max-height:45vh;flex-shrink:0;}
-.sp-r{flex:1;overflow:auto;padding:10px;}
+.sp-l{width:300px;border-right:1px solid var(--border);overflow-y:auto;max-height:45vh;flex-shrink:0;overscroll-behavior:contain;}
+.sp-r{flex:1;overflow:auto;padding:10px;overscroll-behavior:contain;}
 .sp-empty{padding:18px;color:var(--danger);font-weight:600;}
 .sp-hint{padding:14px;color:#94a3b8;}
 .si{padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:11px;transition:background .12s;}
@@ -149,7 +153,7 @@ td.st-free{background:var(--success-soft);color:var(--success);font-size:8px;}
 .stl{font-weight:700;font-size:11px;margin:8px 0 4px;color:#334155;}
 
 /* ---- カレンダー ---- */
-.cal-wrap{overflow:auto;height:calc(100vh - var(--chrome-h));height:calc(100dvh - var(--chrome-h));}
+.cal-wrap{overflow:auto;height:calc(100vh - var(--chrome-h));height:calc(100dvh - var(--chrome-h));overscroll-behavior:contain;}
 .cal-header{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;left:0;}
 .cal-header button{padding:6px 14px;border:1px solid var(--border);border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);transition:background .15s,color .15s,border-color .15s;}
 .cal-header button:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
@@ -170,7 +174,7 @@ table.cal td.holiday-col{background:#fdf2f4;}
 
 /* ---- モーダル ---- */
 .modal-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(7,13,26,.55);backdrop-filter:blur(3px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
-.modal-card{background:var(--surface);border-radius:16px;padding:22px;max-width:420px;width:100%;box-shadow:var(--shadow-lg);animation:modal-pop .18s ease;}
+.modal-card{background:var(--surface);border-radius:16px;padding:22px;max-width:420px;width:100%;box-shadow:var(--shadow-lg);animation:modal-pop .18s ease;max-height:92vh;max-height:92dvh;overflow:auto;}
 @keyframes modal-pop{from{transform:scale(.96) translateY(6px);opacity:0;}to{transform:none;opacity:1;}}
 .modal-title{margin:0 0 16px;font-size:16px;text-align:center;font-weight:700;}
 .modal-sec{margin-bottom:12px;padding:10px 12px;border-radius:10px;border:1px solid;}
@@ -203,13 +207,41 @@ table.cal td.holiday-col{background:#fdf2f4;}
 
 /* ---- モバイル ---- */
 @media (max-width:700px){
+  :root{--topbar-h:44px;--filter-h:96px;--chrome-h:140px;--panel-h:68vh;}
   .topbar{padding:0 10px;gap:8px;overflow-x:auto;overflow-y:hidden;}
   .topbar h1{font-size:13px;}
   .topbar .info{display:none;}
-  .tb-btn{font-size:10px;padding:5px 9px;}
-  .filter-bar{padding:0 10px;gap:8px;}
+  .tb-btn{font-size:10px;padding:6px 10px;}
+  /* フィルターバーを2段組みにして検索欄を常に見えるように */
+  .filter-bar{flex-wrap:wrap;overflow:visible;padding:6px 10px;gap:6px 8px;align-content:center;}
+  .filter-bar .sep{display:none;}
+  .filter-bar label{font-size:12px;}
+  .filter-bar label:nth-of-type(2){display:none;}
+  /* 16px未満だとiOSがフォーカス時に自動ズームするため16pxに */
+  .filter-bar select,.filter-bar input{font-size:16px;padding:6px 10px;}
+  #f-name{flex:1 1 120px;width:auto;min-width:110px;}
+  .seg button{font-size:12px;padding:7px 12px;}
+  .pinned-info{font-size:12px;}
+  .cal-header{padding:6px 10px;gap:8px;}
+  .cal-header button{padding:8px 14px;}
+  .cal-header .cal-range{font-size:12px;}
+  /* タップ標的を44pxに拡大し文字も一回り大きく */
+  table.m td,table.cal td{height:44px;min-width:64px;max-width:76px;}
+  table.m th,table.cal th{font-size:10px;}
+  table.cal th.event-h,table.cal th.date-h{min-width:64px;max-width:76px;}
+  td .n{font-size:11px;}
+  td .s{font-size:10px;}
+  td.off{font-size:14px;}
+  .rn,table.cal .rn{min-width:78px;font-size:12px;}
+  .mini-btn{padding:6px 12px;font-size:11px;}
   .sp-b{flex-direction:column;}
-  .sp-l{width:100%;max-height:26vh;border-right:none;border-bottom:1px solid var(--border);}
+  .sp-l{width:100%;max-height:30vh;border-right:none;border-bottom:1px solid var(--border);}
+  .si{padding:12px 14px;font-size:12px;}
+  .sp-h{padding:12px 14px;}
+  .sp-h button{padding:8px 14px;}
+  .pv{padding:10px 12px;gap:8px;}
+  .btn{padding:10px 16px;}
+  .modal-sel{font-size:16px;padding:10px;}
 }
 
 /* ---- 印刷 ---- */
@@ -243,6 +275,8 @@ table.cal td.holiday-col{background:#fdf2f4;}
 <button onclick="checkPW()">ログイン</button><p id="pw-err">パスワードが違います</p>
 <div class="pw-ver">
 <p>
+v6.2 2026-07-30 20:00<br>
+- スマホ操作性を大幅改善（検索欄常時表示・タップ拡大・自動ズーム抑止）<br>
 v6.1 2026-07-30 18:00<br>
 - 新機能: 教務提出用の正式書類（Excel）へ自動入力しダウンロード<br>
 v6.0 2026-07-30 15:00<br>
@@ -500,8 +534,7 @@ function searchSwap(mt,md,mp,me){
     cands.push({t:ot,l:o.lesson,sb:o.subject,d:o.day,p:o.period,pc:o.pcode,offWarn:offWarnFlag,offMsg:offWarnMsg});
   });
   document.getElementById('sp').classList.add('open');
-  document.getElementById('mw').style.height='calc(100vh - var(--chrome-h) - var(--panel-h))';
-  document.getElementById('cw').style.height='calc(100vh - var(--chrome-h) - var(--panel-h))';
+  document.body.classList.add('sp-open');
   document.getElementById('sp-t').textContent=mt+' '+DN[md]+mp+'限「'+me.lesson+'」('+mc+') → 交換候補'+cands.length+'件';
   var lh='';
   if(!cands.length){lh='<div class="sp-empty">交換可能な相手がいません</div>';}
@@ -842,7 +875,7 @@ function subTTPrint(sc,hl,ol){
   h+='</tr></table>';return h;
 }
 
-function closeSwap(){document.getElementById('sp').classList.remove('open');document.getElementById('mw').style.height='calc(100vh - var(--chrome-h))';document.getElementById('cw').style.height='calc(100vh - var(--chrome-h))';renderCal();highlights={};renderM();document.getElementById('top-info').textContent='単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定';}
+function closeSwap(){document.getElementById('sp').classList.remove('open');document.body.classList.remove('sp-open');renderCal();highlights={};renderM();document.getElementById('top-info').textContent='単独授業のコマをクリック → 交換候補を検索 ／ 教員名クリック → 📌ピン固定';}
 function resetAll(){closeSwap();unpin();document.getElementById('f-subj').value='';document.getElementById('f-name').value='';renderM();}
 
 // カレンダー
